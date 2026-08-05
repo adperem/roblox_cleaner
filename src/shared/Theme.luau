@@ -52,7 +52,9 @@ export type RarityName = "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary" |
 
 -- `pips` = número de marcas en la esquina del marco (redundancia para daltónicos).
 -- `dashed` = borde discontinuo. `effect` = animación extra del marco.
-Theme.RarityFrame: { [RarityName]: { pips: number, dashed: boolean, effect: string? } } = {
+export type RarityFrameStyle = { pips: number, dashed: boolean, effect: string? }
+
+local rarityFrame: { [RarityName]: RarityFrameStyle } = {
 	Common = { pips = 1, dashed = false },
 	Uncommon = { pips = 2, dashed = false },
 	Rare = { pips = 3, dashed = true },
@@ -60,6 +62,7 @@ Theme.RarityFrame: { [RarityName]: { pips: number, dashed: boolean, effect: stri
 	Legendary = { pips = 5, dashed = false, effect = "Glow" },
 	Secret = { pips = 6, dashed = false, effect = "Shimmer" },
 }
+Theme.RarityFrame = rarityFrame
 
 --------------------------------------------------------------------------------
 -- Espaciado y radios (en píxeles de referencia, escala de 4)
@@ -87,32 +90,35 @@ export type TextStyle = {
 	Shadow: number,
 }
 
-Theme.Text: { [string]: TextStyle } = {
+local text: { [string]: TextStyle } = {
 	Title = { Font = Enum.Font.LuckiestGuy, Size = 56, Outline = 3, Shadow = 6 },
 	Heading = { Font = Enum.Font.FredokaOne, Size = 30, Outline = 1, Shadow = 0 },
 	Body = { Font = Enum.Font.GothamMedium, Size = 20, Outline = 0, Shadow = 0 },
 	Money = { Font = Enum.Font.Bangers, Size = 48, Outline = 2, Shadow = 5 },
 	Small = { Font = Enum.Font.GothamBold, Size = 14, Outline = 0, Shadow = 0 },
 }
+Theme.Text = text
 
 --------------------------------------------------------------------------------
 -- Movimiento
 --------------------------------------------------------------------------------
 
-Theme.Duration = {
+local duration: { [string]: number } = {
 	Tap = 0.09,
 	PopIn = 0.22,
 	Celebrate = 0.90,
 	Tooltip = 0.12,
 	ScreenTransition = 0.26,
 }
+Theme.Duration = duration
 
-Theme.Easing = {
+local easing: { [string]: Enum.EasingStyle } = {
 	Tap = Enum.EasingStyle.Back,
 	PopIn = Enum.EasingStyle.Back,
 	Celebrate = Enum.EasingStyle.Elastic,
 	Tooltip = Enum.EasingStyle.Quad,
 }
+Theme.Easing = easing
 
 --[[
 	Devuelve el TweenInfo del movimiento con nombre `name`.
