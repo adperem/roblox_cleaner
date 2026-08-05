@@ -11,11 +11,12 @@ function WorldService.start()
 		return
 	end
 
+	-- Ancho de sobra para cubrir las 3 zonas (Origin en X = 0, 250, 500).
 	local floor = Instance.new("Part")
 	floor.Name = "Floor"
 	floor.Anchored = true
-	floor.Size = Vector3.new(200, 4, 200)
-	floor.Position = Vector3.new(0, -2, 0)
+	floor.Size = Vector3.new(700, 4, 250)
+	floor.Position = Vector3.new(250, -2, 0)
 	floor.Color = Color3.fromHex("#4A7C3C")
 	floor.Material = Enum.Material.Grass
 	floor.Parent = Workspace

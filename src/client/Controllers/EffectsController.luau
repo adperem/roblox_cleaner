@@ -2,10 +2,13 @@
 --[[ Feedback visual y sonoro del chorro de agua. Puramente cosmético — no
 	envía ni recibe nada del servidor, solo lee el estado de SprayController. ]]
 
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local SprayController = require(script.Parent.SprayController)
+
+local player = Players.LocalPlayer
 
 local EffectsController = {}
 
@@ -65,7 +68,8 @@ function EffectsController.start()
 		local camera = Workspace.CurrentCamera
 		local firing = SprayController.isFiring()
 		local _, position = SprayController.getAim()
-		local hasHit = firing and position ~= nil
+		local tank = (player:GetAttribute("WaterTank") :: number?) or 100
+		local hasHit = firing and position ~= nil and tank > 0
 
 		beam.Enabled = hasHit
 		splash.Enabled = hasHit

@@ -1,17 +1,14 @@
 --!strict
 --[[
-	TargetService — construye los objetivos sucios de la zona actual.
+	TargetService — construye los objetivos sucios de las 3 zonas.
 
-	Cada objetivo son dos parts superpuestas:
-	  - una part "limpia" debajo (color claro, siempre sólida, da la colisión),
-	  - una part "sucia" encima (marrón, sin colisión, es la que se etiqueta,
-	    se apunta y se raycastea).
-	El atributo `Progress` de la part sucia controla su transparencia — al
-	llegar a 100 se vuelve invisible y se ve la limpia debajo. Es una
-	aproximación deliberadamente simple para este prototipo: el disolvido
-	píxel a píxel con EditableImage descrito en el documento de diseño
-	(sección 3.2) es una pasada de arte/tech aparte, posterior a validar que
-	la mecánica en sí es divertida.
+	Cada objetivo son dos parts superpuestas: una "limpia" debajo (siempre
+	sólida, da la colisión) y una "sucia" encima (sin colisión, es la que se
+	etiqueta, se apunta y se raycastea). El atributo `Progress` de la part
+	sucia controla su transparencia — al llegar a 100 se vuelve invisible y
+	se ve la limpia debajo. Es una aproximación deliberadamente simple: el
+	disolvido píxel a píxel con EditableImage (documento de diseño, sección
+	3.2) es una pasada de arte/tech aparte, posterior a validar el bucle.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -19,7 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local Theme = require(ReplicatedStorage.Shared.Theme)
-local Zone1 = require(ReplicatedStorage.Shared.Config.Zone1)
+local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 
 local TAG = "DirtyTarget"
 
@@ -28,13 +25,15 @@ local TargetService = {}
 local targetsFolder: Folder
 local targetsById: { [string]: Part } = {}
 
-local function buildTarget(def: Zone1.TargetDef): Part
+local function buildTarget(zone: Zones.ZoneDef, def: Zones.TargetDef): Part
+	local worldPosition = zone.Origin + def.LocalPosition
+
 	local clean = Instance.new("Part")
 	clean.Name = def.Id .. "_Clean"
 	clean.Anchored = true
 	clean.CanCollide = true
 	clean.Size = def.Size
-	clean.CFrame = CFrame.new(def.Position)
+	clean.CFrame = CFrame.new(worldPosition)
 	clean.Color = Theme.Color.SurfaceElevated
 	clean.Material = Enum.Material.SmoothPlastic
 	clean.Parent = targetsFolder
@@ -55,6 +54,7 @@ local function buildTarget(def: Zone1.TargetDef): Part
 	dirt:SetAttribute("DisplayName", def.Name)
 	dirt:SetAttribute("Progress", 0)
 	dirt:SetAttribute("Payout", def.Payout)
+	dirt:SetAttribute("XP", def.XP)
 	dirt:SetAttribute("Cleaned", false)
 
 	CollectionService:AddTag(dirt, TAG)
@@ -63,13 +63,29 @@ local function buildTarget(def: Zone1.TargetDef): Part
 	return dirt
 end
 
+local function buildZonePad(zone: Zones.ZoneDef)
+	local pad = Instance.new("Part")
+	pad.Name = zone.Id .. "_Pad"
+	pad.Anchored = true
+	pad.CanCollide = false
+	pad.Size = Vector3.new(10, 1, 10)
+	pad.CFrame = CFrame.new(zone.Origin)
+	pad.Color = Theme.Color.Primary
+	pad.Material = Enum.Material.Neon
+	pad.Transparency = 0.4
+	pad.Parent = targetsFolder
+end
+
 function TargetService.start()
 	targetsFolder = Instance.new("Folder")
 	targetsFolder.Name = "DirtyTargets"
 	targetsFolder.Parent = Workspace
 
-	for _, def in Zone1 do
-		buildTarget(def)
+	for _, zone in Zones do
+		buildZonePad(zone)
+		for _, def in zone.Targets do
+			buildTarget(zone, def)
+		end
 	end
 end
 

@@ -1,12 +1,14 @@
 --!strict
 --[[
-	CleaningService — el núcleo del prototipo. Autoridad total del servidor:
+	CleaningService — el núcleo del juego. Autoridad total del servidor:
 
 	El cliente solo puede decir "estoy apuntando a este objetivo, sí/no".
 	El servidor decide cuánto avanza el progreso (según la boquilla que ÉL
 	mismo tiene registrada para ese jugador, no la que el cliente diga tener),
-	valida la distancia en cada tick, y es el único que toca el dinero.
-	Ningún número que importe para la economía viaja nunca desde el cliente.
+	valida la distancia en cada tick, gasta y rellena el depósito de agua de
+	cada jugador, y es el único que toca el dinero y la XP (a través de
+	PlayerDataService). Ningún número que importe para la economía viaja
+	nunca desde el cliente.
 ]]
 
 local Players = game:GetService("Players")
@@ -17,6 +19,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local Nozzles = require(ReplicatedStorage.Shared.Config.Nozzles)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local TargetService = require(script.Parent.TargetService)
+local PlayerDataService = require(script.Parent.PlayerDataService)
 
 local CleaningService = {}
 
@@ -46,18 +49,9 @@ local function isCleaned(target: Part): boolean
 	return target:GetAttribute("Cleaned") == true
 end
 
-local function payout(player: Player, target: Part)
-	local leaderstats = player:FindFirstChild("leaderstats")
-	local money = leaderstats and leaderstats:FindFirstChild("Money") :: IntValue?
-	if not money then
-		return
-	end
-	local amount = target:GetAttribute("Payout") :: number
-	money.Value += amount
-	Net.getRemoteEvent("TargetCompleted"):FireClient(player, target:GetAttribute("TargetId"), amount)
-end
-
 local function tick(dt: number)
+	local drainedThisTick: { [Player]: boolean } = {}
+
 	for player, target in activeSessions do
 		if not target.Parent then
 			activeSessions[player] = nil
@@ -74,17 +68,40 @@ local function tick(dt: number)
 			continue
 		end
 
+		local tank = (player:GetAttribute("WaterTank") :: number?) or GameConfig.WaterTankMax
+		if tank <= 0 then
+			continue -- sin agua: no limpia hasta que se rellene
+		end
+
 		local power = getNozzlePower(player)
 		local progress = math.min(100, (target:GetAttribute("Progress") :: number) + power * dt)
 		target:SetAttribute("Progress", progress)
+		player:SetAttribute("WaterTank", math.max(0, tank - GameConfig.WaterDrainRate * dt))
+		drainedThisTick[player] = true
 
 		if progress >= 100 then
 			target:SetAttribute("Cleaned", true)
 			activeSessions[player] = nil
-			payout(player, target)
+
+			local payout = target:GetAttribute("Payout") :: number
+			local xp = target:GetAttribute("XP") :: number
+			PlayerDataService.grantCleaningReward(player, payout, xp)
+			Net.getRemoteEvent("TargetCompleted"):FireClient(player, target:GetAttribute("TargetId"), payout)
+
 			task.delay(GameConfig.RespawnDelay, function()
 				TargetService.reset(target)
 			end)
+		end
+	end
+
+	-- Rellena el depósito de todo el mundo salvo quien lo esté gastando ahora mismo.
+	for _, player in Players:GetPlayers() do
+		if drainedThisTick[player] then
+			continue
+		end
+		local tank = (player:GetAttribute("WaterTank") :: number?) or GameConfig.WaterTankMax
+		if tank < GameConfig.WaterTankMax then
+			player:SetAttribute("WaterTank", math.min(GameConfig.WaterTankMax, tank + GameConfig.WaterRefillRate * dt))
 		end
 	end
 end

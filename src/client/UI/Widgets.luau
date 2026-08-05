@@ -97,4 +97,41 @@ function Widgets.pillButton(props: ButtonProps): TextButton
 	return button
 end
 
+export type TogglePanelProps = {
+	Parent: Instance,
+	OpenButton: TextButton,
+	Size: UDim2,
+	Position: UDim2,
+	AnchorPoint: Vector2?,
+}
+
+--[[ El panel oculto/plegable que abren los botones de la barra lateral
+	(mejoras, mapa, misiones): mismo cofre, misma lista con relleno, mismo
+	toggle de visibilidad — cada llamador solo añade sus propias filas. ]]
+function Widgets.togglePanel(props: TogglePanelProps): Frame
+	local panel = Widgets.panel({
+		Parent = props.Parent,
+		Size = props.Size,
+		Position = props.Position,
+		AnchorPoint = props.AnchorPoint,
+	})
+	panel.Visible = false
+
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 8)
+	layout.Parent = panel
+
+	local padding = Instance.new("UIPadding")
+	padding.PaddingTop = UDim.new(0, 12)
+	padding.PaddingLeft = UDim.new(0, 12)
+	padding.PaddingRight = UDim.new(0, 12)
+	padding.Parent = panel
+
+	props.OpenButton.MouseButton1Click:Connect(function()
+		panel.Visible = not panel.Visible
+	end)
+
+	return panel
+end
+
 return Widgets

@@ -10,6 +10,11 @@ local GameConfig = {
 	-- Segundos tras completar un objetivo hasta que vuelve a ensuciarse.
 	RespawnDelay = 4,
 	StartingMoney = 0,
+
+	-- Depósito de agua: se gasta disparando, se rellena solo al soltar el gatillo.
+	WaterTankMax = 100,
+	WaterDrainRate = 14, -- %/s mientras se dispara
+	WaterRefillRate = 25, -- %/s mientras no se dispara
 }
 
 return GameConfig

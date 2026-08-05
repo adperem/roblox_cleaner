@@ -12,7 +12,13 @@ local RunService = game:GetService("RunService")
 
 local Net = {}
 
-export type EventName = "SetSpraying" | "RequestBuyNozzle" | "TargetCompleted"
+export type EventName =
+	"SetSpraying"
+	| "RequestBuyNozzle"
+	| "TargetCompleted"
+	| "RequestTeleport"
+	| "RequestClaimMission"
+	| "MissionClaimed"
 
 local FOLDER_NAME = "PressureWashRemotes"
 

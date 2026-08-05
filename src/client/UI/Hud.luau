@@ -1,6 +1,8 @@
 --!strict
---[[ HUD de partida: dinero, mira, botón de disparo, barra de progreso del
-	objetivo apuntado, tienda de boquillas y la celebración al cobrar. ]]
+--[[ HUD de partida: orquesta las piezas (StatusBar, paneles de la barra
+	lateral) y se queda con lo que es puramente de la partida en curso —
+	mira, botón de disparo, barra de progreso del objetivo apuntado y la
+	celebración al cobrar (contrato o misión). ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,33 +11,22 @@ local TweenService = game:GetService("TweenService")
 
 local Theme = require(ReplicatedStorage.Shared.Theme)
 local Net = require(ReplicatedStorage.Shared.Net)
-local Nozzles = require(ReplicatedStorage.Shared.Config.Nozzles)
+local DailyMissions = require(ReplicatedStorage.Shared.Config.DailyMissions)
 local Widgets = require(script.Parent.Widgets)
+local StatusBar = require(script.Parent.StatusBar)
+local ShopPanel = require(script.Parent.ShopPanel)
+local ZonePanel = require(script.Parent.ZonePanel)
+local MissionsPanel = require(script.Parent.MissionsPanel)
 local SprayController = require(script.Parent.Parent.Controllers.SprayController)
 
 local player = Players.LocalPlayer
 
-local Hud = {}
-
-type ShopRow = { Button: TextButton }
-type ShopRows = { [number]: ShopRow }
-
-local function buildMoneyLabel(parent: Instance): TextLabel
-	local label = Instance.new("TextLabel")
-	label.Name = "Money"
-	label.Size = UDim2.fromOffset(220, 64)
-	label.Position = UDim2.fromOffset(16, 16)
-	label.BackgroundTransparency = 1
-	label.Font = Theme.Text.Money.Font
-	label.TextSize = Theme.Text.Money.Size
-	label.TextColor3 = Theme.Color.Money
-	label.TextStrokeTransparency = 0
-	label.TextStrokeColor3 = Theme.Color.Outline
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.Text = "$0"
-	label.Parent = parent
-	return label
+local missionsById = {}
+for _, mission in DailyMissions do
+	missionsById[mission.Id] = mission
 end
+
+local Hud = {}
 
 local function buildReticle(parent: Instance)
 	local reticle = Instance.new("Frame")
@@ -137,90 +128,6 @@ local function buildFireButton(parent: Instance)
 	end)
 end
 
-local function buildShopPanel(parent: Instance, openButton: TextButton): ShopRows
-	local panel = Widgets.panel({
-		Parent = parent,
-		Size = UDim2.fromOffset(300, 260),
-		Position = UDim2.new(0, 16, 1, -32),
-		AnchorPoint = Vector2.new(0, 1),
-		BackgroundColor = Theme.Color.BackgroundAlt,
-	})
-	panel.Visible = false
-
-	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 8)
-	layout.Parent = panel
-
-	local padding = Instance.new("UIPadding")
-	padding.PaddingTop = UDim.new(0, 12)
-	padding.PaddingLeft = UDim.new(0, 12)
-	padding.PaddingRight = UDim.new(0, 12)
-	padding.Parent = panel
-
-	local rows: ShopRows = {}
-
-	for _, nozzle in Nozzles do
-		local row = Instance.new("Frame")
-		row.Size = UDim2.new(1, 0, 0, 56)
-		row.BackgroundTransparency = 1
-
-		local label = Instance.new("TextLabel")
-		label.Size = UDim2.new(0.6, 0, 1, 0)
-		label.BackgroundTransparency = 1
-		label.Font = Theme.Text.Body.Font
-		label.TextSize = 16
-		label.TextXAlignment = Enum.TextXAlignment.Left
-		label.TextColor3 = Theme.Color.TextOnDark
-		label.Text = `{nozzle.Name}\n{nozzle.Power}%/s`
-		label.Parent = row
-
-		local buyButton = Widgets.pillButton({
-			Parent = row,
-			Size = UDim2.new(0.35, 0, 0.7, 0),
-			Position = UDim2.new(1, 0, 0.5, 0),
-			AnchorPoint = Vector2.new(1, 0.5),
-			Text = if nozzle.Price == 0 then "—" else `${nozzle.Price}`,
-			BackgroundColor = Theme.Color.Success,
-		})
-
-		buyButton.MouseButton1Click:Connect(function()
-			Net.getRemoteEvent("RequestBuyNozzle"):FireServer(nozzle.Tier)
-		end)
-
-		row.Parent = panel
-		rows[nozzle.Tier] = { Button = buyButton }
-	end
-
-	openButton.MouseButton1Click:Connect(function()
-		panel.Visible = not panel.Visible
-	end)
-
-	return rows
-end
-
-local function refreshShopRows(rows: ShopRows, money: number, currentTier: number)
-	for _, nozzle in Nozzles do
-		local row = rows[nozzle.Tier]
-		if not row then
-			continue
-		end
-		local button = row.Button
-		if nozzle.Tier <= currentTier then
-			button.Text = "✓"
-			button.BackgroundColor3 = Theme.Color.Dirty
-			button.Active = false
-		elseif nozzle.Tier == currentTier + 1 then
-			button.Active = true
-			button.BackgroundColor3 = if money >= nozzle.Price then Theme.Color.Success else Theme.Color.Danger
-			button.Text = `${nozzle.Price}`
-		else
-			button.Active = false
-			button.BackgroundColor3 = Theme.Color.Dirty
-			button.Text = "🔒"
-		end
-	end
-end
-
 function Hud.start()
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "PressureWashHud"
@@ -228,32 +135,14 @@ function Hud.start()
 	screenGui.IgnoreGuiInset = true
 	screenGui.Parent = player:WaitForChild("PlayerGui")
 
-	local moneyLabel = buildMoneyLabel(screenGui)
+	StatusBar.build(screenGui)
 	buildReticle(screenGui)
 	local progressContainer, progressFill, progressLabel = buildProgressBar(screenGui)
 	local celebrationFrame, celebrationLabel = buildCelebration(screenGui)
 	buildFireButton(screenGui)
-
-	local shopOpenButton = Widgets.pillButton({
-		Parent = screenGui,
-		Size = UDim2.fromOffset(140, 48),
-		Position = UDim2.new(0, 16, 1, -32),
-		AnchorPoint = Vector2.new(0, 1),
-		Text = "🛠️ Mejoras",
-		BackgroundColor = Theme.Color.Primary,
-	})
-	local shopRows = buildShopPanel(screenGui, shopOpenButton)
-
-	local leaderstats = player:WaitForChild("leaderstats")
-	local money = leaderstats:WaitForChild("Money") :: IntValue
-
-	local function refresh()
-		moneyLabel.Text = `${money.Value}`
-		refreshShopRows(shopRows, money.Value, player:GetAttribute("NozzleTier") :: number)
-	end
-	money:GetPropertyChangedSignal("Value"):Connect(refresh)
-	player:GetAttributeChangedSignal("NozzleTier"):Connect(refresh)
-	refresh()
+	ShopPanel.build(screenGui)
+	ZonePanel.build(screenGui)
+	MissionsPanel.build(screenGui)
 
 	RunService.RenderStepped:Connect(function()
 		local target = SprayController.getAim()
@@ -267,13 +156,24 @@ function Hud.start()
 		end
 	end)
 
-	Net.getRemoteEvent("TargetCompleted").OnClientEvent:Connect(function(_targetId: unknown, amount: unknown)
-		celebrationLabel.Text = `+${amount}`
+	local function popCelebration(text: string)
+		celebrationLabel.Text = text
 		celebrationFrame.Size = UDim2.fromOffset(0, 0)
-		TweenService:Create(celebrationFrame, Theme.tween("Celebrate"), { Size = UDim2.fromOffset(260, 90) }):Play()
+		TweenService:Create(celebrationFrame, Theme.tween("Celebrate"), { Size = UDim2.fromOffset(280, 120) }):Play()
 		task.delay(1, function()
 			TweenService:Create(celebrationFrame, Theme.tween("PopIn"), { Size = UDim2.fromOffset(0, 0) }):Play()
 		end)
+	end
+
+	Net.getRemoteEvent("TargetCompleted").OnClientEvent:Connect(function(_targetId: unknown, amount: unknown)
+		popCelebration(`+${amount}`)
+	end)
+
+	Net.getRemoteEvent("MissionClaimed").OnClientEvent:Connect(function(missionId: unknown)
+		local mission = typeof(missionId) == "string" and missionsById[missionId]
+		if mission then
+			popCelebration(`+${mission.MoneyReward}\n+{mission.XpReward} XP`)
+		end
 	end)
 end
 
