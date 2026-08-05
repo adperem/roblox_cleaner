@@ -31,6 +31,13 @@ local function tryEquipPet(player: Player, petId: string?)
 	PlayerDataService.setEquippedPet(player, petId)
 end
 
+local function tryFusePets(player: Player, petId: string, tier: string)
+	local success, resultKey = PlayerDataService.fusePets(player, petId, tier)
+	if success then
+		Net.getRemoteEvent("PetFused"):FireClient(player, resultKey)
+	end
+end
+
 function PetService.start()
 	Net.getRemoteEvent("RequestBuyEgg").OnServerEvent:Connect(function(player, eggId)
 		if typeof(eggId) == "string" then
@@ -41,6 +48,12 @@ function PetService.start()
 	Net.getRemoteEvent("RequestEquipPet").OnServerEvent:Connect(function(player, petId)
 		if petId == nil or typeof(petId) == "string" then
 			tryEquipPet(player, petId)
+		end
+	end)
+
+	Net.getRemoteEvent("RequestFusePets").OnServerEvent:Connect(function(player, petId, tier)
+		if typeof(petId) == "string" and typeof(tier) == "string" then
+			tryFusePets(player, petId, tier)
 		end
 	end)
 end

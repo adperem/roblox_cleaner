@@ -21,19 +21,17 @@ local Widgets = require(script.Parent.Widgets)
 
 local player = Players.LocalPlayer
 
-local petsById = {}
-for _, pet in Pets do
-	petsById[pet.Id] = pet
-end
-
 local TradePanel = {}
 
-local function petLabel(petId: string?): string
-	if not petId then
+local function petLabel(storageKey: string?): string
+	if not storageKey then
 		return "(nada)"
 	end
-	local pet = petsById[petId]
-	return if pet then pet.Name else petId
+	local petId, tier = Pets.parseStorageKey(storageKey)
+	if not Pets.getById(petId) then
+		return storageKey
+	end
+	return Pets.displayName(petId, tier)
 end
 
 local function buildInviteList(content: ScrollingFrame)
@@ -248,35 +246,40 @@ local function buildTradeWindow(screenGui: ScreenGui)
 	local pickerSlots: { [string]: Frame } = {}
 
 	local function refreshPicker()
-		for _, pet in Pets do
-			local count = (player:GetAttribute("PetCount_" .. pet.Id) :: number?) or 0
-			local slot = pickerSlots[pet.Id]
-			if count > 0 and not slot then
-				local newSlot = Instance.new("Frame")
-				newSlot.Size = UDim2.new(1, 0, 0, 36)
-				newSlot.BackgroundTransparency = 1
-				newSlot.Parent = picker
+		for _, pet in Pets.List do
+			for _, tier in { "Normal", "Golden", "Rainbow" } :: { Pets.PetTier } do
+				local key = Pets.storageKey(pet.Id, tier)
+				local count = (player:GetAttribute("PetCount_" .. key) :: number?) or 0
+				local slot = pickerSlots[key]
+				if count > 0 and not slot then
+					local newSlot = Instance.new("Frame")
+					newSlot.Size = UDim2.new(1, 0, 0, 36)
+					newSlot.BackgroundTransparency = 1
+					newSlot.Parent = picker
 
-				local newButton = Widgets.pillButton({
-					Parent = newSlot,
-					Size = UDim2.fromScale(1, 1),
-					Text = pet.Name,
-					BackgroundColor = Theme.Rarity[pet.Rarity],
-				})
-				newButton.MouseButton1Click:Connect(function()
-					myOffer = if myOffer == pet.Id then nil else pet.Id
-					Net.getRemoteEvent("RequestSetTradeOffer"):FireServer(myOffer)
-				end)
-				pickerSlots[pet.Id] = newSlot
-			elseif count <= 0 and slot then
-				slot:Destroy()
-				pickerSlots[pet.Id] = nil
+					local newButton = Widgets.pillButton({
+						Parent = newSlot,
+						Size = UDim2.fromScale(1, 1),
+						Text = Pets.displayName(pet.Id, tier),
+						BackgroundColor = Theme.Rarity[pet.Rarity],
+					})
+					newButton.MouseButton1Click:Connect(function()
+						myOffer = if myOffer == key then nil else key
+						Net.getRemoteEvent("RequestSetTradeOffer"):FireServer(myOffer)
+					end)
+					pickerSlots[key] = newSlot
+				elseif count <= 0 and slot then
+					slot:Destroy()
+					pickerSlots[key] = nil
+				end
 			end
 		end
 	end
 
-	for _, pet in Pets do
-		player:GetAttributeChangedSignal("PetCount_" .. pet.Id):Connect(refreshPicker)
+	for _, pet in Pets.List do
+		for _, tier in { "Normal", "Golden", "Rainbow" } :: { Pets.PetTier } do
+			player:GetAttributeChangedSignal("PetCount_" .. Pets.storageKey(pet.Id, tier)):Connect(refreshPicker)
+		end
 	end
 
 	readyButton.MouseButton1Click:Connect(function()

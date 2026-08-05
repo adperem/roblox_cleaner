@@ -5,8 +5,11 @@
 	confirmación, y un bloqueo de `GameConfig.TradeConfirmDelay` segundos
 	antes de que se cierre de verdad — si cualquiera de los dos cambia lo
 	que ofrece durante esos segundos, la cuenta atrás se reinicia. Solo una
-	mascota por lado; sin fusión ni cosméticos todavía, así que no hay más
-	que comerciar por ahora.
+	mascota por lado; sin cosméticos todavía (no existen), así que no hay
+	más que comerciar por ahora. Las mascotas fusionadas (Doradas, Arcoíris)
+	ya se pueden comerciar sin ningún cambio aquí: su clave de
+	almacenamiento (ver Pets.storageKey) es solo una cadena más para este
+	servicio, que nunca mira qué significa.
 
 	Cada sesión vive en dos sitios a la vez: `activeTrades` (jugador ->
 	sesión, para comprobar "¿está ocupado?" en O(1)) y `sessions` (la lista

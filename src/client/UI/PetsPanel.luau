@@ -1,9 +1,10 @@
 --!strict
---[[ Comprar huevos, ver mascotas conseguidas (con siluetas para las que
-	faltan) y equipar una. Pestaña 🐾 del menú. El revelado al abrir huevo
-	se muestra como overlay a nivel de pantalla (necesita `screenGui`, no
-	solo el contenido de la pestaña, para que se vea aunque cambies de
-	pestaña justo después de comprar). ]]
+--[[ Comprar huevos, ver mascotas conseguidas por nivel de fusión (Normal,
+	Dorada, Arcoíris — con siluetas para las que faltan), equipar una y
+	fusionar 5 iguales en la siguiente. Pestaña 🐾 del menú. El revelado al
+	abrir huevo se muestra como overlay a nivel de pantalla (necesita
+	`screenGui`, no solo el contenido de la pestaña, para que se vea aunque
+	cambies de pestaña justo después de comprar). ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,14 +18,20 @@ local Widgets = require(script.Parent.Widgets)
 
 local player = Players.LocalPlayer
 
-local petsById = {}
-for _, pet in Pets do
-	petsById[pet.Id] = pet
-end
+local TIERS: { Pets.PetTier } = { "Normal", "Golden", "Rainbow" }
 
 local PetsPanel = {}
 
-type PetRow = { Row: Frame, EquipButton: TextButton, CountLabel: TextLabel, NameLabel: TextLabel }
+type PetRow = {
+	Row: Frame,
+	PetId: string,
+	Tier: Pets.PetTier,
+	StorageKey: string,
+	EquipButton: TextButton,
+	FuseButton: TextButton?,
+	CountLabel: TextLabel,
+	NameLabel: TextLabel,
+}
 
 local function buildEggRow(parent: Instance, egg: Eggs.EggDef): TextButton
 	local row = Instance.new("Frame")
@@ -57,7 +64,7 @@ local function buildEggRow(parent: Instance, egg: Eggs.EggDef): TextButton
 	return buyButton
 end
 
-local function buildPetRow(parent: Instance): (Frame, PetRow)
+local function buildPetRow(parent: Instance, petId: string, tier: Pets.PetTier): PetRow
 	local row = Instance.new("Frame")
 	row.Size = UDim2.new(1, 0, 0, 44)
 	row.BorderSizePixel = 0
@@ -66,18 +73,19 @@ local function buildPetRow(parent: Instance): (Frame, PetRow)
 	corner.Parent = row
 
 	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Size = UDim2.new(0.52, 0, 1, 0)
+	nameLabel.Size = UDim2.new(0.4, 0, 1, 0)
 	nameLabel.Position = UDim2.fromOffset(8, 0)
 	nameLabel.BackgroundTransparency = 1
 	nameLabel.Font = Theme.Text.Body.Font
-	nameLabel.TextSize = 13
+	nameLabel.TextSize = 12
 	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
 	nameLabel.TextColor3 = Theme.Color.TextOnDark
+	nameLabel.TextWrapped = true
 	nameLabel.Parent = row
 
 	local countLabel = Instance.new("TextLabel")
-	countLabel.Size = UDim2.new(0.18, 0, 1, 0)
-	countLabel.Position = UDim2.new(0.52, 0, 0, 0)
+	countLabel.Size = UDim2.new(0.12, 0, 1, 0)
+	countLabel.Position = UDim2.new(0.4, 0, 0, 0)
 	countLabel.BackgroundTransparency = 1
 	countLabel.Font = Theme.Text.Small.Font
 	countLabel.TextSize = 13
@@ -85,17 +93,41 @@ local function buildPetRow(parent: Instance): (Frame, PetRow)
 	countLabel.Text = "x0"
 	countLabel.Parent = row
 
+	-- Botones en escala pura (nunca mezclada con offset): el ancho real de
+	-- la fila depende del ScrollingFrame que la contiene, no es fijo.
+	local canFuse = Pets.nextTier(tier) ~= nil
 	local equipButton = Widgets.pillButton({
 		Parent = row,
-		Size = UDim2.new(0.28, 0, 0.75, 0),
-		Position = UDim2.new(1, -6, 0.5, 0),
+		Size = UDim2.new(if canFuse then 0.21 else 0.44, 0, 0.75, 0),
+		Position = UDim2.new(0.98, 0, 0.5, 0),
 		AnchorPoint = Vector2.new(1, 0.5),
 		Text = "🔒",
 		BackgroundColor = Theme.Color.Dirty,
 	})
 
+	local fuseButton = nil
+	if canFuse then
+		fuseButton = Widgets.pillButton({
+			Parent = row,
+			Size = UDim2.new(0.21, 0, 0.75, 0),
+			Position = UDim2.new(0.54, 0, 0.5, 0),
+			AnchorPoint = Vector2.new(0, 0.5),
+			Text = "⚗️",
+			BackgroundColor = Theme.Color.Dirty,
+		})
+	end
+
 	row.Parent = parent
-	return row, { Row = row, EquipButton = equipButton, CountLabel = countLabel, NameLabel = nameLabel }
+	return {
+		Row = row,
+		PetId = petId,
+		Tier = tier,
+		StorageKey = Pets.storageKey(petId, tier),
+		EquipButton = equipButton,
+		FuseButton = fuseButton,
+		CountLabel = countLabel,
+		NameLabel = nameLabel,
+	}
 end
 
 local function buildRevealPopup(parent: Instance): (Frame, TextLabel, UIStroke)
@@ -134,48 +166,64 @@ function PetsPanel.build(screenGui: ScreenGui, content: ScrollingFrame)
 	local buyButton = buildEggRow(content, egg)
 
 	local rows: { [string]: PetRow } = {}
-	for _, pet in Pets do
-		local _row, entry = buildPetRow(content)
-		rows[pet.Id] = entry
+	for _, pet in Pets.List do
+		for _, tier in TIERS do
+			local entry = buildPetRow(content, pet.Id, tier)
+			rows[entry.StorageKey] = entry
+		end
 	end
 
 	local function refresh()
 		local equipped = player:GetAttribute("EquippedPet")
-		for _, pet in Pets do
-			local entry = rows[pet.Id]
-			if not entry then
-				continue
-			end
-			local count = (player:GetAttribute("PetCount_" .. pet.Id) :: number?) or 0
-			local owned = count > 0
+		for _, pet in Pets.List do
+			for _, tier in TIERS do
+				local entry = rows[Pets.storageKey(pet.Id, tier)]
+				if not entry then
+					continue
+				end
+				local count = (player:GetAttribute("PetCount_" .. entry.StorageKey) :: number?) or 0
+				local owned = count > 0
 
-			entry.Row.BackgroundColor3 = if owned then Theme.Rarity[pet.Rarity] else Theme.Color.Dirty
-			entry.Row.BackgroundTransparency = if owned then 0 else 0.5
-			entry.CountLabel.Text = `x{count}`
-			entry.NameLabel.Text = if owned then pet.Name else "???"
+				entry.Row.BackgroundColor3 = if owned then Theme.Rarity[pet.Rarity] else Theme.Color.Dirty
+				entry.Row.BackgroundTransparency = if owned then 0 else 0.5
+				entry.CountLabel.Text = `x{count}`
+				entry.NameLabel.Text = if owned then Pets.displayName(pet.Id, tier) else "???"
 
-			if not owned then
-				entry.EquipButton.Active = false
-				entry.EquipButton.Text = "🔒"
-				entry.EquipButton.BackgroundColor3 = Theme.Color.Dirty
-			elseif equipped == pet.Id then
-				entry.EquipButton.Active = true
-				entry.EquipButton.Text = "✓"
-				entry.EquipButton.BackgroundColor3 = Theme.Color.Success
-			else
-				entry.EquipButton.Active = true
-				entry.EquipButton.Text = "Equipar"
-				entry.EquipButton.BackgroundColor3 = Theme.Color.Primary
+				if not owned then
+					entry.EquipButton.Active = false
+					entry.EquipButton.Text = "🔒"
+					entry.EquipButton.BackgroundColor3 = Theme.Color.Dirty
+				elseif equipped == entry.StorageKey then
+					entry.EquipButton.Active = true
+					entry.EquipButton.Text = "✓"
+					entry.EquipButton.BackgroundColor3 = Theme.Color.Success
+				else
+					entry.EquipButton.Active = true
+					entry.EquipButton.Text = "Poner"
+					entry.EquipButton.BackgroundColor3 = Theme.Color.Primary
+				end
+
+				if entry.FuseButton then
+					local ready = count >= Pets.FusionCost
+					entry.FuseButton.Active = ready
+					entry.FuseButton.Text = if ready then `⚗️ {Pets.FusionCost}→1` else "⚗️"
+					entry.FuseButton.BackgroundColor3 = if ready then Theme.Color.Money else Theme.Color.Dirty
+				end
 			end
 		end
 	end
 
-	for _, pet in Pets do
-		rows[pet.Id].EquipButton.MouseButton1Click:Connect(function()
+	for _, entry in rows do
+		entry.EquipButton.MouseButton1Click:Connect(function()
 			local equipped = player:GetAttribute("EquippedPet")
-			local newEquipped = if equipped == pet.Id then nil else pet.Id
+			local newEquipped = if equipped == entry.StorageKey then nil else entry.StorageKey
 			Net.getRemoteEvent("RequestEquipPet"):FireServer(newEquipped)
 		end)
+		if entry.FuseButton then
+			entry.FuseButton.MouseButton1Click:Connect(function()
+				Net.getRemoteEvent("RequestFusePets"):FireServer(entry.PetId, entry.Tier)
+			end)
+		end
 	end
 
 	local leaderstats = player:WaitForChild("leaderstats")
@@ -187,27 +235,43 @@ function PetsPanel.build(screenGui: ScreenGui, content: ScrollingFrame)
 	refreshBuyButton()
 
 	player:GetAttributeChangedSignal("EquippedPet"):Connect(refresh)
-	for _, pet in Pets do
-		player:GetAttributeChangedSignal("PetCount_" .. pet.Id):Connect(refresh)
+	for _, entry in rows do
+		player:GetAttributeChangedSignal("PetCount_" .. entry.StorageKey):Connect(refresh)
 	end
 	refresh()
 
 	local reveal, revealLabel, revealStroke = buildRevealPopup(screenGui)
-	Net.getRemoteEvent("PetHatched").OnClientEvent:Connect(function(petId: unknown)
-		if typeof(petId) ~= "string" then
-			return
-		end
-		local pet = petsById[petId]
-		if not pet then
-			return
-		end
-		revealStroke.Color = Theme.Rarity[pet.Rarity]
-		revealLabel.Text = `🥚 ¡{pet.Name}!\n({pet.Rarity})`
+	local function popReveal(text: string, color: Color3)
+		revealStroke.Color = color
+		revealLabel.Text = text
 		reveal.Size = UDim2.fromOffset(0, 0)
 		TweenService:Create(reveal, Theme.tween("Celebrate"), { Size = UDim2.fromOffset(300, 140) }):Play()
 		task.delay(2, function()
 			TweenService:Create(reveal, Theme.tween("PopIn"), { Size = UDim2.fromOffset(0, 0) }):Play()
 		end)
+	end
+
+	Net.getRemoteEvent("PetHatched").OnClientEvent:Connect(function(petId: unknown)
+		if typeof(petId) ~= "string" then
+			return
+		end
+		local pet = Pets.getById(petId)
+		if not pet then
+			return
+		end
+		popReveal(`🥚 ¡{pet.Name}!\n({pet.Rarity})`, Theme.Rarity[pet.Rarity])
+	end)
+
+	Net.getRemoteEvent("PetFused").OnClientEvent:Connect(function(resultKey: unknown)
+		if typeof(resultKey) ~= "string" then
+			return
+		end
+		local petId, tier = Pets.parseStorageKey(resultKey)
+		local pet = Pets.getById(petId)
+		if not pet then
+			return
+		end
+		popReveal(`⚗️ ¡Fusión lista!\n{Pets.displayName(petId, tier)}`, Theme.Rarity[pet.Rarity])
 	end)
 end
 

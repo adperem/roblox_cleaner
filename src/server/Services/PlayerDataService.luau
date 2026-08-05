@@ -132,9 +132,12 @@ local function syncAttributes(player: Player, data: ProfileData)
 		local claimed: boolean = data.ClaimedMissions[mission.Id] == true
 		player:SetAttribute("Claimed_" .. mission.Id, claimed)
 	end
-	for _, pet in Pets do
-		local count: number = data.OwnedPets[pet.Id] or 0
-		player:SetAttribute("PetCount_" .. pet.Id, count)
+	for _, pet in Pets.List do
+		for _, tier in { "Normal", "Golden", "Rainbow" } do
+			local key = Pets.storageKey(pet.Id, tier :: Pets.PetTier)
+			local count: number = data.OwnedPets[key] or 0
+			player:SetAttribute("PetCount_" .. key, count)
+		end
 	end
 	for _, tier in SeasonPass.Tiers do
 		local freeClaimed: boolean = data.ClaimedSeasonTiers[seasonTierKey(tier.Tier, "Free")] == true
@@ -287,48 +290,89 @@ function PlayerDataService.claimMission(player: Player, missionId: string): bool
 	return true
 end
 
+-- Los huevos siempre sortean un ejemplar Normal (`petId` es el Id base) —
+-- la única forma de conseguir un Dorado o un Arcoíris es fusionando.
 function PlayerDataService.addPet(player: Player, petId: string)
 	local profile = loaded[player]
 	if not profile then
 		return
 	end
-	profile.Data.OwnedPets[petId] = (profile.Data.OwnedPets[petId] or 0) + 1
+	local key = Pets.storageKey(petId, "Normal")
+	profile.Data.OwnedPets[key] = (profile.Data.OwnedPets[key] or 0) + 1
 	syncAttributes(player, profile.Data)
 end
 
-function PlayerDataService.setEquippedPet(player: Player, petId: string?): boolean
+function PlayerDataService.setEquippedPet(player: Player, storageKey: string?): boolean
 	local profile = loaded[player]
 	if not profile then
 		return false
 	end
-	if petId ~= nil and (profile.Data.OwnedPets[petId] or 0) <= 0 then
+	if storageKey ~= nil and (profile.Data.OwnedPets[storageKey] or 0) <= 0 then
 		return false
 	end
-	profile.Data.EquippedPet = petId
+	profile.Data.EquippedPet = storageKey
 	syncAttributes(player, profile.Data)
 	return true
 end
 
+-- Fusiona 5 ejemplares del mismo Id y nivel en 1 del siguiente nivel
+-- (Normal -> Dorada -> Arcoíris). Si el equipado era justo el que se
+-- gasta del todo, el resultado fusionado se equipa solo en su lugar.
+function PlayerDataService.fusePets(player: Player, petId: string, tier: string): (boolean, string?)
+	local profile = loaded[player]
+	if not profile then
+		return false, nil
+	end
+	if tier ~= "Normal" and tier ~= "Golden" then
+		return false, nil
+	end
+	if not Pets.getById(petId) then
+		return false, nil
+	end
+
+	local currentTier = tier :: Pets.PetTier
+	local nextTier = Pets.nextTier(currentTier)
+	if not nextTier then
+		return false, nil
+	end
+
+	local key = Pets.storageKey(petId, currentTier)
+	local count = profile.Data.OwnedPets[key] or 0
+	if count < Pets.FusionCost then
+		return false, nil
+	end
+
+	local nextKey = Pets.storageKey(petId, nextTier)
+	profile.Data.OwnedPets[key] = count - Pets.FusionCost
+	profile.Data.OwnedPets[nextKey] = (profile.Data.OwnedPets[nextKey] or 0) + 1
+	if profile.Data.EquippedPet == key and profile.Data.OwnedPets[key] <= 0 then
+		profile.Data.EquippedPet = nextKey
+	end
+
+	syncAttributes(player, profile.Data)
+	return true, nextKey
+end
+
 -- Transfiere una mascota entre dos jugadores ya cargados (comercio). Resta
 -- primero y solo suma si la resta fue válida — nunca crea ni destruye
--- mascotas de la nada.
-function PlayerDataService.transferPet(from: Player, to: Player, petId: string): boolean
+-- mascotas de la nada. `storageKey` puede ser de cualquier nivel de fusión.
+function PlayerDataService.transferPet(from: Player, to: Player, storageKey: string): boolean
 	local fromProfile = loaded[from]
 	local toProfile = loaded[to]
 	if not fromProfile or not toProfile then
 		return false
 	end
 
-	local count = fromProfile.Data.OwnedPets[petId] or 0
+	local count = fromProfile.Data.OwnedPets[storageKey] or 0
 	if count <= 0 then
 		return false
 	end
 
-	fromProfile.Data.OwnedPets[petId] = count - 1
-	if fromProfile.Data.EquippedPet == petId and fromProfile.Data.OwnedPets[petId] <= 0 then
+	fromProfile.Data.OwnedPets[storageKey] = count - 1
+	if fromProfile.Data.EquippedPet == storageKey and fromProfile.Data.OwnedPets[storageKey] <= 0 then
 		fromProfile.Data.EquippedPet = nil
 	end
-	toProfile.Data.OwnedPets[petId] = (toProfile.Data.OwnedPets[petId] or 0) + 1
+	toProfile.Data.OwnedPets[storageKey] = (toProfile.Data.OwnedPets[storageKey] or 0) + 1
 
 	syncAttributes(from, fromProfile.Data)
 	syncAttributes(to, toProfile.Data)
