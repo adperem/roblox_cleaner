@@ -1,5 +1,7 @@
 --!strict
---[[ Tienda de boquillas. Botón en la barra lateral izquierda, arriba. ]]
+--[[ Tienda de boquillas. Pestaña 🛠️ del menú. Las de RequiredRebirths > 0
+	son de prestigio: no basta el dinero, hace falta haberse certificado
+	esa cantidad de veces. ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,24 +15,7 @@ local player = Players.LocalPlayer
 
 local ShopPanel = {}
 
-function ShopPanel.build(screenGui: ScreenGui)
-	local openButton = Widgets.pillButton({
-		Parent = screenGui,
-		Size = UDim2.fromOffset(64, 64),
-		Position = UDim2.new(0, 16, 0.5, -152),
-		AnchorPoint = Vector2.new(0, 0.5),
-		Text = "🛠️",
-		BackgroundColor = Theme.Color.Primary,
-	})
-
-	local panel = Widgets.togglePanel({
-		Parent = screenGui,
-		OpenButton = openButton,
-		Size = UDim2.fromOffset(300, 260),
-		Position = UDim2.new(0, 92, 0.5, -152),
-		AnchorPoint = Vector2.new(0, 0.5),
-	})
-
+function ShopPanel.build(content: ScrollingFrame)
 	local rows: { [number]: TextButton } = {}
 
 	for _, nozzle in Nozzles do
@@ -45,7 +30,8 @@ function ShopPanel.build(screenGui: ScreenGui)
 		label.TextSize = 16
 		label.TextXAlignment = Enum.TextXAlignment.Left
 		label.TextColor3 = Theme.Color.TextOnDark
-		label.Text = `{nozzle.Name}\n{nozzle.Power}%/s`
+		local requirement = if nozzle.RequiredRebirths > 0 then ` · {nozzle.RequiredRebirths}+ rebirths` else ""
+		label.Text = `{nozzle.Name}\n{nozzle.Power}%/s{requirement}`
 		label.Parent = row
 
 		local buyButton = Widgets.pillButton({
@@ -60,7 +46,7 @@ function ShopPanel.build(screenGui: ScreenGui)
 			Net.getRemoteEvent("RequestBuyNozzle"):FireServer(nozzle.Tier)
 		end)
 
-		row.Parent = panel
+		row.Parent = content
 		rows[nozzle.Tier] = buyButton
 	end
 
@@ -69,6 +55,7 @@ function ShopPanel.build(screenGui: ScreenGui)
 
 	local function refresh()
 		local currentTier = (player:GetAttribute("NozzleTier") :: number?) or 1
+		local rebirths = (player:GetAttribute("RebirthCount") :: number?) or 0
 		local cash = money.Value
 
 		for _, nozzle in Nozzles do
@@ -80,19 +67,24 @@ function ShopPanel.build(screenGui: ScreenGui)
 				button.Text = "✓"
 				button.BackgroundColor3 = Theme.Color.Dirty
 				button.Active = false
-			elseif nozzle.Tier == currentTier + 1 then
-				button.Active = true
-				button.BackgroundColor3 = if cash >= nozzle.Price then Theme.Color.Success else Theme.Color.Danger
-				button.Text = `${nozzle.Price}`
-			else
+			elseif nozzle.Tier ~= currentTier + 1 then
 				button.Active = false
 				button.BackgroundColor3 = Theme.Color.Dirty
 				button.Text = "🔒"
+			elseif rebirths < nozzle.RequiredRebirths then
+				button.Active = false
+				button.BackgroundColor3 = Theme.Color.Dirty
+				button.Text = `🔒 {nozzle.RequiredRebirths}+`
+			else
+				button.Active = true
+				button.BackgroundColor3 = if cash >= nozzle.Price then Theme.Color.Success else Theme.Color.Danger
+				button.Text = `${nozzle.Price}`
 			end
 		end
 	end
 
 	player:GetAttributeChangedSignal("NozzleTier"):Connect(refresh)
+	player:GetAttributeChangedSignal("RebirthCount"):Connect(refresh)
 	money:GetPropertyChangedSignal("Value"):Connect(refresh)
 	refresh()
 end

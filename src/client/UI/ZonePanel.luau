@@ -1,6 +1,6 @@
 --!strict
---[[ Mapa de zonas: viajar a cualquiera ya desbloqueada por nivel. Botón en
-	la barra lateral izquierda, en medio. ]]
+--[[ Mapa de zonas: viajar a cualquiera ya desbloqueada por nivel. Pestaña
+	🗺️ del menú. ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,24 +14,7 @@ local player = Players.LocalPlayer
 
 local ZonePanel = {}
 
-function ZonePanel.build(screenGui: ScreenGui)
-	local openButton = Widgets.pillButton({
-		Parent = screenGui,
-		Size = UDim2.fromOffset(64, 64),
-		Position = UDim2.new(0, 16, 0.5, -76),
-		AnchorPoint = Vector2.new(0, 0.5),
-		Text = "🗺️",
-		BackgroundColor = Theme.Color.Primary,
-	})
-
-	local panel = Widgets.togglePanel({
-		Parent = screenGui,
-		OpenButton = openButton,
-		Size = UDim2.fromOffset(300, 220),
-		Position = UDim2.new(0, 92, 0.5, -76),
-		AnchorPoint = Vector2.new(0, 0.5),
-	})
-
+function ZonePanel.build(content: ScrollingFrame)
 	local rows: { [string]: { Button: TextButton, Label: TextLabel } } = {}
 
 	for _, zone in Zones do
@@ -61,7 +44,7 @@ function ZonePanel.build(screenGui: ScreenGui)
 			Net.getRemoteEvent("RequestTeleport"):FireServer(zone.Id)
 		end)
 
-		row.Parent = panel
+		row.Parent = content
 		rows[zone.Id] = { Button = goButton, Label = label }
 	end
 

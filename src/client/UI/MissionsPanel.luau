@@ -1,6 +1,6 @@
 --!strict
 --[[ Misiones diarias: progreso en vivo (atributos server-owned) y cobro
-	manual. Botón en la barra lateral izquierda, abajo. ]]
+	manual. Pestaña 🎯 del menú. ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,24 +14,7 @@ local player = Players.LocalPlayer
 
 local MissionsPanel = {}
 
-function MissionsPanel.build(screenGui: ScreenGui)
-	local openButton = Widgets.pillButton({
-		Parent = screenGui,
-		Size = UDim2.fromOffset(64, 64),
-		Position = UDim2.new(0, 16, 0.5, 0),
-		AnchorPoint = Vector2.new(0, 0.5),
-		Text = "🎯",
-		BackgroundColor = Theme.Color.Primary,
-	})
-
-	local panel = Widgets.togglePanel({
-		Parent = screenGui,
-		OpenButton = openButton,
-		Size = UDim2.fromOffset(320, 260),
-		Position = UDim2.new(0, 92, 0.5, 0),
-		AnchorPoint = Vector2.new(0, 0.5),
-	})
-
+function MissionsPanel.build(content: ScrollingFrame)
 	local rows: { [string]: { Fill: Frame, Button: TextButton } } = {}
 
 	for _, mission in DailyMissions do
@@ -80,7 +63,7 @@ function MissionsPanel.build(screenGui: ScreenGui)
 			Net.getRemoteEvent("RequestClaimMission"):FireServer(mission.Id)
 		end)
 
-		row.Parent = panel
+		row.Parent = content
 		rows[mission.Id] = { Fill = barFill, Button = claimButton }
 	end
 

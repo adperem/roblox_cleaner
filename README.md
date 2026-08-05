@@ -19,7 +19,7 @@ Juego de limpieza con agua a presión para Roblox.
 - [`src/shared/Theme.luau`](src/shared/Theme.luau) — los tokens de ese sistema
   traducidos a Luau. Única fuente de verdad para colores, radios y animaciones.
 
-## Cómo probar el lanzamiento suave (Fase 3)
+## Cómo probar el escalado (Fase 4)
 
 El código está organizado como proyecto [Rojo](https://rojo.space/) — no se edita nada
 dentro de Roblox Studio, solo se sincroniza lo que hay en `src/`.
@@ -36,74 +36,68 @@ dentro de Roblox Studio, solo se sincroniza lo que hay en `src/`.
 5. En Studio, abre el plugin de Rojo y pulsa "Connect".
 6. Dale a Play. Apareces en el Barrio con la mira fija en el centro de la pantalla:
    gira la cámara para apuntar y mantén pulsado 💦 (o clic izquierdo en PC) para
-   disparar. La columna de botones de la izquierda tiene, de arriba abajo: 🛠️
-   boquillas, 🗺️ mapa de zonas, 🎯 misiones diarias, 🐾 huevos y mascotas, 💎
-   gamepasses. Cada pocos minutos aparece un banner arriba avisando de un contrato
-   VIP o de una mutación rara; cada 20 minutos, una Mega Suciedad en el Barrio que
-   puede limpiar todo el servidor a la vez.
+   disparar. El botón ☰ (abajo a la izquierda) abre el menú con pestañas: 🛠️
+   boquillas, 🗺️ mapa, 🎯 misiones, 🐾 mascotas, 💎 gamepasses, 🏆 certificación,
+   🎫 pase de temporada, 🎁 códigos y 🤝 comercio.
 
 No he podido abrir Roblox Studio desde este entorno (no tiene GUI), así que esto no
 está verificado jugando de verdad — solo la sintaxis está comprobada con
-`luau-compile`. Además usé `luau-analyze` para revisar tipos y sí encontró dos bugs
-reales que corregí (ver más abajo); el resto del ruido que da son falsos positivos
-de ejecutarlo sin las definiciones de Roblox ni el sourcemap de Rojo (que aquí no
-tengo) — lo explico si te encuentras alguno raro en tu editor. Pruébalo en tu Studio
-y dime qué falla.
+`luau-compile`. Pruébalo en tu Studio y dime qué falla.
 
-### Qué hay nuevo en la Fase 3
+### Qué hay nuevo en la Fase 4
 
-- **5 zonas**: se añaden Gasolinera (nivel 20) y Mansión (nivel 30) a las tres de la
-  Fase 2.
-- **Mutaciones de suciedad**: cada objetivo sortea una al aparecer (Barro, Grasa,
-  Moho, Chicle, Alquitrán, Slime radiactivo, Suciedad dorada — documento de diseño,
-  sección 5.1), multiplican dinero y XP, y las tres más raras avisan a todo el
-  servidor. Insignia visible en la barra de progreso mientras apuntas.
-- **Contratos VIP**: cada 4 minutos, un objetivo cualquiera ya existente se pone a
-  contrarreloj (90s) con una recompensa 4 veces mayor repartida por cuánto aportó
-  cada jugador, +20% para quien lo remata. Es cooperativo: no hace falta ser tú
-  quien lo empezó para llevarte tu parte.
-- **Mega Suciedad**: cada 20 minutos aparece una estructura enorme en el Barrio
-  (accesible para cualquier nivel) que todo el servidor tiene 5 minutos para limpiar
-  entre todos, con barra de progreso compartida visible para todos. Misma mecánica
-  de reparto por contribución que los contratos VIP.
-- **Mascotas**: un huevo (300$, en el Barrio) sortea una de 7 mascotas por rareza;
-  la equipada da un bonus permanente de dinero. Sin fusión todavía — se deja para
-  cuando haga falta alargar la economía de coleccionables.
-- **Gamepasses**: Dinero x2 (dobla todo lo que ganas, en cualquier sitio) y VIP
-  (depósito de agua un 50% más grande y más rápido). El código de compra y
-  comprobación de propiedad con `MarketplaceService` está completo, pero los
-  `ProductId` están a 0 — un gamepass real **solo se puede crear desde el Creator
-  Dashboard una vez publiques el lugar**, no hay id que pueda inventarme. En cuanto
-  los crees, pégalos en `src/shared/Config/Gamepasses.luau` y el botón de comprar
-  se activa solo.
+- **9 zonas**: se añaden Puerto (nivel 42), Obra (55), Aeropuerto (70) y Estación
+  espacial (90) a las cinco anteriores — las 9 del documento de diseño al completo.
+  Los payouts de estas cuatro son enormes a propósito (hasta $4.8M por objetivo);
+  son números de relleno para la curva de un juego en vivo a largo plazo, no algo
+  con playtesting detrás.
+- **Certificación (rebirth)**: al llegar a nivel 90 con suficiente dinero, puedes
+  certificarte — pierdes el dinero y la boquilla (conservas mascotas), y ganas
+  +25% de dinero acumulativo para siempre más acceso a 2 boquillas de prestigio
+  que no se pueden comprar de otra forma. 6 rangos: Aprendiz → Profesional →
+  Experto → Maestro → Leyenda → Mito. Pide confirmar dos veces — es la acción más
+  destructiva del juego para tu propio progreso.
+- **Pase de temporada**: 30 niveles, carril gratis y carril premium (gamepass). Las
+  fichas se ganan cobrando misiones diarias.
+- **Comercio de mascotas**: invita a otro jugador del servidor, cada uno ofrece una
+  mascota (nunca dinero), y cuando ambos dicen "Listo" hay 3 segundos antes de que
+  se cierre de verdad — cambiar la oferta de cualquiera de los dos lo reinicia. El
+  servidor es quien decide todo; si alguno se desconecta a mitad, se cancela solo.
+- **Códigos canjeables**: un cuadro de texto en el menú, con un código de ejemplo
+  (`LIMPIEZA2026`) ya cargado para probar el flujo.
 
-### Dos bugs reales que encontré revisando antes de darlo por terminado
+### Un bug real que encontré revisando antes de darlo por terminado
 
-- Los contratos VIP calculaban su cuenta atrás con `os.clock()` en el servidor y
-  se la mandaban tal cual al cliente — ese reloj no está sincronizado entre
-  máquinas (cada una arranca su propio contador desde que se inicia el proceso),
-  así que el tiempo restante habría salido sin sentido en el HUD. Cambiado a
-  `os.time()` en todo `EventService.luau`, que sí es comparable entre servidor y
-  cliente.
-- Si un contrato VIP se completaba limpiándolo de verdad (no por agotarse el
-  tiempo), nunca se volvía a llamar a `TargetService.reset()` — el objetivo se
-  quedaba "limpio" para siempre y desaparecía del juego hasta reiniciar el
-  servidor. Corregido en `EventService.resolve()`.
+Al construir el menú con pestañas nuevo (necesario porque ya no cabían 9 botones
+sueltos en pantalla), varios botones quedaron como hijos directos de contenedores
+con `UIListLayout` (la fila de pestañas, el contenido de una pestaña, el selector
+de mascota del comercio). El problema: todo botón de `Widgets.pillButton` añade su
+sombra como un hermano en el mismo padre — si ese padre tiene `UIListLayout`, la
+sombra cuela como un elemento más de la lista y descoloca todo lo que va detrás.
+Lo comprobé programáticamente barriendo los 12 archivos de UI en busca de este
+patrón exacto y corregí los 3 sitios reales envolviendo cada botón en su propio
+`Frame` (ver `MenuShell.luau`, `RebirthPanel.luau`, `TradePanel.luau`).
 
 ### Lo que sigue siendo una aproximación deliberada
 
 - **El desprendido de la suciedad** sigue siendo dos piezas superpuestas, no el
   disolvido píxel a píxel con `EditableImage` del documento de diseño (sección 3.2).
-- **Sin sonido todavía** (ni de disparo ni de eventos): sigue sin `SoundId` por el
-  mismo motivo de siempre, no voy a inventar un asset que no sé si existe.
-- Los contratos VIP eligen el objetivo al azar entre las 5 zonas sin tener en cuenta
-  qué nivel tiene la población del servidor — un contrato podría salir en la Mansión
-  con todo el mundo todavía en el Barrio. Es un ajuste de balance para cuando haya
-  datos reales de juego, no algo que se pueda afinar a ciegas.
-- Sin fusión de mascotas, sin rebirth/certificación, sin trading — quedan para la
-  Fase 4 (documento de diseño).
+- **Sin sonido todavía**: sigue sin `SoundId` por el mismo motivo de siempre, no voy
+  a inventar un asset que no sé si existe.
+- Los contratos VIP (Fase 3) siguen sin tener en cuenta el nivel de la población del
+  servidor al elegir objetivo — ajuste de balance pendiente de datos reales.
+- El pase de temporada premia con dinero, no con cosméticos/mascotas exclusivas de
+  temporada — eso es contenido nuevo que diseñar, no algo que se puede improvisar
+  sin inventar assets.
+- Sin fusión de mascotas ni trading de cosméticos (no hay cosméticos todavía) — el
+  documento de diseño ya los deja para más adelante.
 
 ## Estado
 
-Fase 3 en curso: lanzamiento suave (5 zonas, mutaciones, contratos VIP, Mega
-Suciedad, mascotas, gamepasses). Pendiente de probarse en Roblox Studio.
+Fase 4 en curso: escalado (9 zonas, certificación/rebirth, pase de temporada,
+comercio de mascotas, códigos) — los 5 puntos que pide esa fase del documento de
+diseño. Quedan fuera a propósito, para cuando haga falta: arte real (todo sigue
+siendo cajas de colores), sonido, el disolvido píxel a píxel, fusión de mascotas,
+UGC/cosméticos, y la cadencia de LiveOps semanal/mensual en sí (eso no es un
+entregable de código, es un ritmo de contenido continuo). Pendiente de probarse en
+Roblox Studio.

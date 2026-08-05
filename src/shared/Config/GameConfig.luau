@@ -32,6 +32,16 @@ local GameConfig = {
 	MegaDirtBaseReward = 500, -- × jugadores conectados al aparecer
 	MegaDirtBaseXp = 100, -- × jugadores conectados al aparecer
 	MegaDirtDespawnDelay = 6, -- segundos que se queda visible ya limpia
+
+	-- Certificación (rebirth, sección 4.3): +25% de ganancias por rebirth,
+	-- acumulativo (no compuesto).
+	RebirthMoneyBonusPerCount = 0.25,
+
+	-- Comercio de mascotas (sección 5.5): cuánto se mantiene la cuenta
+	-- atrás antes de que un trueque con ambos "listos" se cierre de verdad.
+	-- Cualquier cambio de oferta durante este tiempo la reinicia.
+	TradeConfirmDelay = 3,
+	TradeInviteTimeout = 30,
 }
 
 return GameConfig

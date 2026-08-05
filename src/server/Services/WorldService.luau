@@ -11,12 +11,12 @@ function WorldService.start()
 		return
 	end
 
-	-- Ancho de sobra para cubrir las 5 zonas (Origin en X = 0, 250, 500, 750, 1050).
+	-- Ancho de sobra para cubrir las 9 zonas (Origin en X de 0 a 2250).
 	local floor = Instance.new("Part")
 	floor.Name = "Floor"
 	floor.Anchored = true
-	floor.Size = Vector3.new(1250, 4, 250)
-	floor.Position = Vector3.new(525, -2, 0)
+	floor.Size = Vector3.new(2400, 4, 250)
+	floor.Position = Vector3.new(1150, -2, 0)
 	floor.Color = Color3.fromHex("#4A7C3C")
 	floor.Material = Enum.Material.Grass
 	floor.Parent = Workspace

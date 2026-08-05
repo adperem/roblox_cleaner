@@ -1,7 +1,8 @@
 --!strict
---[[ Tienda de gamepasses. Si un gamepass todavía no existe en el Creator
-	Dashboard (ProductId = 0 en la config), el botón sale desactivado con
-	"Pronto" — no se puede invocar MarketplaceService con un id que no existe. ]]
+--[[ Tienda de gamepasses. Pestaña 💎 del menú. Si un gamepass todavía no
+	existe en el Creator Dashboard (ProductId = 0 en la config), el botón
+	sale desactivado con "Pronto" — no se puede invocar MarketplaceService
+	con un id que no existe. ]]
 
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -15,24 +16,7 @@ local player = Players.LocalPlayer
 
 local GamepassPanel = {}
 
-function GamepassPanel.build(screenGui: ScreenGui)
-	local openButton = Widgets.pillButton({
-		Parent = screenGui,
-		Size = UDim2.fromOffset(64, 64),
-		Position = UDim2.new(0, 16, 0.5, 152),
-		AnchorPoint = Vector2.new(0, 0.5),
-		Text = "💎",
-		BackgroundColor = Theme.Color.Money,
-	})
-
-	local panel = Widgets.togglePanel({
-		Parent = screenGui,
-		OpenButton = openButton,
-		Size = UDim2.fromOffset(320, 220),
-		Position = UDim2.new(0, 92, 0.5, 152),
-		AnchorPoint = Vector2.new(0, 0.5),
-	})
-
+function GamepassPanel.build(content: ScrollingFrame)
 	for _, gamepass in Gamepasses do
 		local row = Instance.new("Frame")
 		row.Size = UDim2.new(1, 0, 0, 64)
@@ -76,7 +60,7 @@ function GamepassPanel.build(screenGui: ScreenGui)
 			refresh()
 		end
 
-		row.Parent = panel
+		row.Parent = content
 	end
 end
 

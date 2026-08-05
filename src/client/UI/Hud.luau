@@ -14,12 +14,17 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local DailyMissions = require(ReplicatedStorage.Shared.Config.DailyMissions)
 local Mutations = require(ReplicatedStorage.Shared.Config.Mutations)
 local Widgets = require(script.Parent.Widgets)
+local MenuShell = require(script.Parent.MenuShell)
 local StatusBar = require(script.Parent.StatusBar)
 local ShopPanel = require(script.Parent.ShopPanel)
 local ZonePanel = require(script.Parent.ZonePanel)
 local MissionsPanel = require(script.Parent.MissionsPanel)
 local PetsPanel = require(script.Parent.PetsPanel)
 local GamepassPanel = require(script.Parent.GamepassPanel)
+local RebirthPanel = require(script.Parent.RebirthPanel)
+local SeasonPassPanel = require(script.Parent.SeasonPassPanel)
+local CodesPanel = require(script.Parent.CodesPanel)
+local TradePanel = require(script.Parent.TradePanel)
 local AnnouncementBanner = require(script.Parent.AnnouncementBanner)
 local MegaDirtBanner = require(script.Parent.MegaDirtBanner)
 local SprayController = require(script.Parent.Parent.Controllers.SprayController)
@@ -160,13 +165,20 @@ function Hud.start()
 	local progressContainer, progressFill, progressLabel, mutationBadge = buildProgressBar(screenGui)
 	local celebrationFrame, celebrationLabel = buildCelebration(screenGui)
 	buildFireButton(screenGui)
-	ShopPanel.build(screenGui)
-	ZonePanel.build(screenGui)
-	MissionsPanel.build(screenGui)
-	PetsPanel.build(screenGui)
-	GamepassPanel.build(screenGui)
 	AnnouncementBanner.build(screenGui)
 	MegaDirtBanner.build(screenGui)
+
+	MenuShell.build(screenGui, {
+		{ Id = "shop", Icon = "🛠️", Build = ShopPanel.build },
+		{ Id = "zones", Icon = "🗺️", Build = ZonePanel.build },
+		{ Id = "missions", Icon = "🎯", Build = MissionsPanel.build },
+		{ Id = "pets", Icon = "🐾", Build = function(content) PetsPanel.build(screenGui, content) end },
+		{ Id = "gamepasses", Icon = "💎", Build = GamepassPanel.build },
+		{ Id = "rebirth", Icon = "🏆", Build = RebirthPanel.build },
+		{ Id = "season", Icon = "🎫", Build = SeasonPassPanel.build },
+		{ Id = "codes", Icon = "🎁", Build = CodesPanel.build },
+		{ Id = "trade", Icon = "🤝", Build = function(content) TradePanel.build(screenGui, content) end },
+	})
 
 	RunService.RenderStepped:Connect(function()
 		local target = SprayController.getAim()

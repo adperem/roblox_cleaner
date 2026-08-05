@@ -25,7 +25,7 @@ local function tryBuy(player: Player, requestedTier: unknown)
 	end
 
 	local nozzle = Nozzles[requestedTier]
-	if not nozzle or data.Money < nozzle.Price then
+	if not nozzle or data.Money < nozzle.Price or data.RebirthCount < nozzle.RequiredRebirths then
 		return
 	end
 

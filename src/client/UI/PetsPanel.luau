@@ -1,6 +1,9 @@
 --!strict
 --[[ Comprar huevos, ver mascotas conseguidas (con siluetas para las que
-	faltan) y equipar una. El revelado al abrir huevo se muestra aquí mismo. ]]
+	faltan) y equipar una. Pestaña 🐾 del menú. El revelado al abrir huevo
+	se muestra como overlay a nivel de pantalla (necesita `screenGui`, no
+	solo el contenido de la pestaña, para que se vea aunque cambies de
+	pestaña justo después de comprar). ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -126,42 +129,13 @@ local function buildRevealPopup(parent: Instance): (Frame, TextLabel, UIStroke)
 	return reveal, label, stroke
 end
 
-function PetsPanel.build(screenGui: ScreenGui)
-	local openButton = Widgets.pillButton({
-		Parent = screenGui,
-		Size = UDim2.fromOffset(64, 64),
-		Position = UDim2.new(0, 16, 0.5, 76),
-		AnchorPoint = Vector2.new(0, 0.5),
-		Text = "🐾",
-		BackgroundColor = Theme.Color.Primary,
-	})
-
-	local panel = Widgets.togglePanel({
-		Parent = screenGui,
-		OpenButton = openButton,
-		Size = UDim2.fromOffset(320, 320),
-		Position = UDim2.new(0, 92, 0.5, 76),
-		AnchorPoint = Vector2.new(0, 0.5),
-	})
-
+function PetsPanel.build(screenGui: ScreenGui, content: ScrollingFrame)
 	local egg = Eggs.List[1]
-	local buyButton = buildEggRow(panel, egg)
-
-	local scrollFrame = Instance.new("ScrollingFrame")
-	scrollFrame.Size = UDim2.new(1, 0, 1, -56)
-	scrollFrame.BackgroundTransparency = 1
-	scrollFrame.BorderSizePixel = 0
-	scrollFrame.ScrollBarThickness = 6
-	scrollFrame.CanvasSize = UDim2.fromScale(0, 0)
-	scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	local listLayout = Instance.new("UIListLayout")
-	listLayout.Padding = UDim.new(0, 6)
-	listLayout.Parent = scrollFrame
-	scrollFrame.Parent = panel
+	local buyButton = buildEggRow(content, egg)
 
 	local rows: { [string]: PetRow } = {}
 	for _, pet in Pets do
-		local _row, entry = buildPetRow(scrollFrame)
+		local _row, entry = buildPetRow(content)
 		rows[pet.Id] = entry
 	end
 

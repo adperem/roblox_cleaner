@@ -1,14 +1,14 @@
 --!strict
 --[[
 	PlayerDataService — único dueño y escritor del perfil guardado de cada
-	jugador (dinero, XP, boquilla, mascotas, progreso de misiones diarias).
-	Todo lo demás lee/escribe a través de las funciones de este módulo, nunca
-	tocando el `IntValue` de leaderstats ni el perfil directamente — así el
-	leaderstat, los atributos que lee el HUD y lo que se guarda en el
-	DataStore no pueden desincronizarse entre sí. También es el único punto
-	donde se aplica el gamepass de Dinero x2, para que valga en todos los
-	sitios donde se gana dinero (limpiar, misiones, eventos) sin repetir la
-	lógica en cada uno.
+	jugador (dinero, XP, boquilla, mascotas, rebirth, pase de temporada,
+	códigos canjeados, progreso de misiones diarias). Todo lo demás
+	lee/escribe a través de las funciones de este módulo, nunca tocando el
+	`IntValue` de leaderstats ni el perfil directamente — así el leaderstat,
+	los atributos que lee el HUD y lo que se guarda en el DataStore no
+	pueden desincronizarse entre sí. También es el único punto donde se
+	aplican el gamepass de Dinero x2 y el bonus de rebirth, para que valgan
+	en todos los sitios donde se gana dinero sin repetir la lógica en cada uno.
 
 	Si el perfil no se puede cargar (típicamente: en Studio sin "Enable
 	Studio Access to API Services" activado en Game Settings > Security), la
@@ -25,6 +25,9 @@ local Nozzles = require(ReplicatedStorage.Shared.Config.Nozzles)
 local Levels = require(ReplicatedStorage.Shared.Config.Levels)
 local DailyMissions = require(ReplicatedStorage.Shared.Config.DailyMissions)
 local Pets = require(ReplicatedStorage.Shared.Config.Pets)
+local Rebirths = require(ReplicatedStorage.Shared.Config.Rebirths)
+local SeasonPass = require(ReplicatedStorage.Shared.Config.SeasonPass)
+local Codes = require(ReplicatedStorage.Shared.Config.Codes)
 local GamepassService = require(script.Parent.GamepassService)
 
 local PlayerDataService = {}
@@ -39,6 +42,10 @@ export type ProfileData = {
 	ClaimedMissions: { [string]: boolean },
 	OwnedPets: { [string]: number },
 	EquippedPet: string?,
+	RebirthCount: number,
+	SeasonTokens: number,
+	ClaimedSeasonTiers: { [string]: boolean },
+	RedeemedCodes: { [string]: boolean },
 }
 
 local TEMPLATE: ProfileData = {
@@ -50,11 +57,20 @@ local TEMPLATE: ProfileData = {
 	MoneyEarnedToday = 0,
 	ClaimedMissions = {},
 	OwnedPets = {},
+	RebirthCount = 0,
+	SeasonTokens = 0,
+	ClaimedSeasonTiers = {},
+	RedeemedCodes = {},
 }
 
 local missionsById = {}
 for _, mission in DailyMissions do
 	missionsById[mission.Id] = mission
+end
+
+local codesById = {}
+for _, code in Codes do
+	codesById[code.Code] = code
 end
 
 local playerStore = ProfileStoreLib.New("PlayerStore_v1", TEMPLATE)
@@ -80,14 +96,20 @@ local function ensureCurrentDay(data: ProfileData)
 	end
 end
 
--- Único sitio donde se aplica el gamepass de Dinero x2. Solo a ganancias
--- (montos positivos) — una compra en la tienda resta dinero con esta misma
--- función y no debería duplicarse el descuento.
-local function applyMoneyMultiplier(player: Player, amount: number): number
-	if amount > 0 and GamepassService.playerOwns(player, "MoneyX2") then
-		return amount * 2
+local function seasonTierKey(tier: number, track: string): string
+	return `{tier}_{track}`
+end
+
+-- Único sitio donde se aplican el gamepass de Dinero x2 y el bonus de
+-- rebirth. Solo a ganancias (montos positivos) — una compra en la tienda
+-- resta dinero con esta misma función y no debería duplicarse el descuento.
+local function applyMoneyMultiplier(player: Player, data: ProfileData, amount: number): number
+	if amount <= 0 then
+		return amount
 	end
-	return amount
+	local rebirthBonus = 1 + GameConfig.RebirthMoneyBonusPerCount * data.RebirthCount
+	local gamepassBonus = if GamepassService.playerOwns(player, "MoneyX2") then 2 else 1
+	return amount * rebirthBonus * gamepassBonus
 end
 
 local function syncAttributes(player: Player, data: ProfileData)
@@ -102,6 +124,10 @@ local function syncAttributes(player: Player, data: ProfileData)
 	player:SetAttribute("TargetsCleanedToday", data.TargetsCleanedToday)
 	player:SetAttribute("MoneyEarnedToday", data.MoneyEarnedToday)
 	player:SetAttribute("EquippedPet", data.EquippedPet)
+	player:SetAttribute("RebirthCount", data.RebirthCount)
+	player:SetAttribute("Rank", Rebirths.rankForCount(data.RebirthCount))
+	player:SetAttribute("SeasonTokens", data.SeasonTokens)
+
 	for _, mission in DailyMissions do
 		local claimed: boolean = data.ClaimedMissions[mission.Id] == true
 		player:SetAttribute("Claimed_" .. mission.Id, claimed)
@@ -109,6 +135,12 @@ local function syncAttributes(player: Player, data: ProfileData)
 	for _, pet in Pets do
 		local count: number = data.OwnedPets[pet.Id] or 0
 		player:SetAttribute("PetCount_" .. pet.Id, count)
+	end
+	for _, tier in SeasonPass.Tiers do
+		local freeClaimed: boolean = data.ClaimedSeasonTiers[seasonTierKey(tier.Tier, "Free")] == true
+		local premiumClaimed: boolean = data.ClaimedSeasonTiers[seasonTierKey(tier.Tier, "Premium")] == true
+		player:SetAttribute(`SeasonClaimed_{tier.Tier}_Free`, freeClaimed)
+		player:SetAttribute(`SeasonClaimed_{tier.Tier}_Premium`, premiumClaimed)
 	end
 end
 
@@ -190,7 +222,7 @@ function PlayerDataService.addMoney(player: Player, amount: number)
 	if not profile then
 		return
 	end
-	profile.Data.Money = math.max(0, profile.Data.Money + applyMoneyMultiplier(player, amount))
+	profile.Data.Money = math.max(0, profile.Data.Money + applyMoneyMultiplier(player, profile.Data, amount))
 	syncAttributes(player, profile.Data)
 end
 
@@ -220,7 +252,7 @@ function PlayerDataService.grantCleaningReward(player: Player, money: number, xp
 		return
 	end
 	ensureCurrentDay(profile.Data)
-	local finalMoney = applyMoneyMultiplier(player, money)
+	local finalMoney = applyMoneyMultiplier(player, profile.Data, money)
 	profile.Data.Money += finalMoney
 	profile.Data.XP += xp
 	profile.Data.TargetsCleanedToday += 1
@@ -248,8 +280,9 @@ function PlayerDataService.claimMission(player: Player, missionId: string): bool
 	end
 
 	profile.Data.ClaimedMissions[missionId] = true
-	profile.Data.Money += applyMoneyMultiplier(player, mission.MoneyReward)
+	profile.Data.Money += applyMoneyMultiplier(player, profile.Data, mission.MoneyReward)
 	profile.Data.XP += mission.XpReward
+	profile.Data.SeasonTokens += mission.SeasonTokens
 	syncAttributes(player, profile.Data)
 	return true
 end
@@ -274,6 +307,111 @@ function PlayerDataService.setEquippedPet(player: Player, petId: string?): boole
 	profile.Data.EquippedPet = petId
 	syncAttributes(player, profile.Data)
 	return true
+end
+
+-- Transfiere una mascota entre dos jugadores ya cargados (comercio). Resta
+-- primero y solo suma si la resta fue válida — nunca crea ni destruye
+-- mascotas de la nada.
+function PlayerDataService.transferPet(from: Player, to: Player, petId: string): boolean
+	local fromProfile = loaded[from]
+	local toProfile = loaded[to]
+	if not fromProfile or not toProfile then
+		return false
+	end
+
+	local count = fromProfile.Data.OwnedPets[petId] or 0
+	if count <= 0 then
+		return false
+	end
+
+	fromProfile.Data.OwnedPets[petId] = count - 1
+	if fromProfile.Data.EquippedPet == petId and fromProfile.Data.OwnedPets[petId] <= 0 then
+		fromProfile.Data.EquippedPet = nil
+	end
+	toProfile.Data.OwnedPets[petId] = (toProfile.Data.OwnedPets[petId] or 0) + 1
+
+	syncAttributes(from, fromProfile.Data)
+	syncAttributes(to, toProfile.Data)
+	return true
+end
+
+function PlayerDataService.claimSeasonTier(player: Player, tierNumber: number, track: string): boolean
+	local profile = loaded[player]
+	if not profile then
+		return false
+	end
+	if track ~= "Free" and track ~= "Premium" then
+		return false
+	end
+	if track == "Premium" and not GamepassService.playerOwns(player, "SeasonPass") then
+		return false
+	end
+
+	local tier = SeasonPass.Tiers[tierNumber]
+	if not tier then
+		return false
+	end
+	local key = seasonTierKey(tierNumber, track)
+	if profile.Data.ClaimedSeasonTiers[key] == true then
+		return false
+	end
+	if profile.Data.SeasonTokens < tier.TokensRequired then
+		return false
+	end
+
+	profile.Data.ClaimedSeasonTiers[key] = true
+	local reward = if track == "Free" then tier.FreeReward else tier.PremiumReward
+	profile.Data.Money += applyMoneyMultiplier(player, profile.Data, reward)
+	syncAttributes(player, profile.Data)
+	return true
+end
+
+function PlayerDataService.redeemCode(player: Player, rawCode: string): (boolean, string)
+	local profile = loaded[player]
+	if not profile then
+		return false, "Tu perfil todavía no ha cargado."
+	end
+
+	local code = string.upper(string.gsub(rawCode, "%s+", ""))
+	local def = codesById[code]
+	if not def then
+		return false, "Ese código no existe."
+	end
+	if profile.Data.RedeemedCodes[code] == true then
+		return false, "Ya has usado ese código."
+	end
+
+	profile.Data.RedeemedCodes[code] = true
+	profile.Data.Money += applyMoneyMultiplier(player, profile.Data, def.MoneyReward)
+	profile.Data.XP += def.XpReward
+	syncAttributes(player, profile.Data)
+	return true, `¡Código canjeado! +${def.MoneyReward} +{def.XpReward} XP`
+end
+
+function PlayerDataService.rebirth(player: Player): (boolean, string)
+	local profile = loaded[player]
+	if not profile then
+		return false, "Tu perfil todavía no ha cargado."
+	end
+
+	local data = profile.Data
+	local nextTier = Rebirths.List[data.RebirthCount + 1]
+	if not nextTier then
+		return false, "Ya tienes el rango máximo."
+	end
+	if Levels.levelForXp(data.XP) < nextTier.RequiredLevel then
+		return false, `Necesitas ser nivel {nextTier.RequiredLevel}.`
+	end
+	if data.Money < nextTier.RequiredMoney then
+		return false, `Necesitas ${nextTier.RequiredMoney}.`
+	end
+
+	data.Money = 0
+	data.XP = 0
+	data.NozzleTier = Nozzles[1].Tier
+	data.RebirthCount += 1
+	syncAttributes(player, data)
+	return true, nextTier.Rank
 end
 
 return PlayerDataService

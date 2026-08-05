@@ -27,6 +27,12 @@ local Gamepasses: { GamepassDef } = {
 		ProductId = 0,
 		Description = "Depósito de agua un 50% más grande y que se rellena un 50% más rápido.",
 	},
+	{
+		Id = "SeasonPass",
+		Name = "Pase de temporada",
+		ProductId = 0,
+		Description = "Desbloquea el carril premium del pase de temporada.",
+	},
 }
 
 return Gamepasses
