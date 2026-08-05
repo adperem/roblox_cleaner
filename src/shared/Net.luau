@@ -39,6 +39,8 @@ export type EventName =
 	| "RequestCancelTrade"
 	| "TradeStateUpdated"
 	| "TradeEnded"
+	| "RequestFusePets"
+	| "PetFused"
 
 local FOLDER_NAME = "PressureWashRemotes"
 

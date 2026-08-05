@@ -19,7 +19,7 @@ Juego de limpieza con agua a presión para Roblox.
 - [`src/shared/Theme.luau`](src/shared/Theme.luau) — los tokens de ese sistema
   traducidos a Luau. Única fuente de verdad para colores, radios y animaciones.
 
-## Cómo probar el escalado (Fase 4)
+## Cómo probarlo
 
 El código está organizado como proyecto [Rojo](https://rojo.space/) — no se edita nada
 dentro de Roblox Studio, solo se sincroniza lo que hay en `src/`.
@@ -40,64 +40,93 @@ dentro de Roblox Studio, solo se sincroniza lo que hay en `src/`.
    boquillas, 🗺️ mapa, 🎯 misiones, 🐾 mascotas, 💎 gamepasses, 🏆 certificación,
    🎫 pase de temporada, 🎁 códigos y 🤝 comercio.
 
-No he podido abrir Roblox Studio desde este entorno (no tiene GUI), así que esto no
-está verificado jugando de verdad — solo la sintaxis está comprobada con
-`luau-compile`. Pruébalo en tu Studio y dime qué falla.
+No he podido abrir Roblox Studio desde este entorno (no tiene GUI), así que nada de
+esto está verificado jugando de verdad. Lo que sí hice antes de darlo por cerrado,
+sobre los 49 archivos del proyecto:
 
-### Qué hay nuevo en la Fase 4
+- Sintaxis de cada archivo comprobada con `luau-compile`.
+- Cada `RemoteEvent` declarado en `Net.luau` tiene un sitio que lo dispara y un
+  sitio que lo escucha (comprobado programáticamente, los 28).
+- Cada atributo que el servidor escribe con `SetAttribute` tiene su lectura
+  correspondiente en el cliente, y viceversa (mismo método).
+- Un barrido de los 15 archivos de interfaz buscando el patrón exacto de un bug
+  real que encontré (ver más abajo), para confirmar que no se repite en ningún
+  otro sitio.
+- Una relectura completa de los servicios más críticos (`PlayerDataService`,
+  `EventService`, `TradeService`, `CleaningService`) buscando comentarios
+  desactualizados o cabos sueltos entre fases — encontré y corregí dos comentarios
+  que ya no describían el código (`TargetService` seguía diciendo "5 zonas",
+  `TradeService` decía "sin fusión" después de haberla implementado).
 
-- **9 zonas**: se añaden Puerto (nivel 42), Obra (55), Aeropuerto (70) y Estación
-  espacial (90) a las cinco anteriores — las 9 del documento de diseño al completo.
-  Los payouts de estas cuatro son enormes a propósito (hasta $4.8M por objetivo);
-  son números de relleno para la curva de un juego en vivo a largo plazo, no algo
-  con playtesting detrás.
-- **Certificación (rebirth)**: al llegar a nivel 90 con suficiente dinero, puedes
-  certificarte — pierdes el dinero y la boquilla (conservas mascotas), y ganas
-  +25% de dinero acumulativo para siempre más acceso a 2 boquillas de prestigio
-  que no se pueden comprar de otra forma. 6 rangos: Aprendiz → Profesional →
-  Experto → Maestro → Leyenda → Mito. Pide confirmar dos veces — es la acción más
-  destructiva del juego para tu propio progreso.
-- **Pase de temporada**: 30 niveles, carril gratis y carril premium (gamepass). Las
-  fichas se ganan cobrando misiones diarias.
-- **Comercio de mascotas**: invita a otro jugador del servidor, cada uno ofrece una
-  mascota (nunca dinero), y cuando ambos dicen "Listo" hay 3 segundos antes de que
-  se cierre de verdad — cambiar la oferta de cualquiera de los dos lo reinicia. El
-  servidor es quien decide todo; si alguno se desconecta a mitad, se cancela solo.
-- **Códigos canjeables**: un cuadro de texto en el menú, con un código de ejemplo
-  (`LIMPIEZA2026`) ya cargado para probar el flujo.
+Pruébalo en tu Studio y dime qué falla.
 
-### Un bug real que encontré revisando antes de darlo por terminado
+### Qué se completó en esta pasada
 
-Al construir el menú con pestañas nuevo (necesario porque ya no cabían 9 botones
-sueltos en pantalla), varios botones quedaron como hijos directos de contenedores
-con `UIListLayout` (la fila de pestañas, el contenido de una pestaña, el selector
-de mascota del comercio). El problema: todo botón de `Widgets.pillButton` añade su
+- **Fusión de mascotas** (documento de diseño, sección 5.4): 5 iguales dan una
+  versión Dorada, 5 Doradas dan una Arcoíris (tope). Cada mascota se guarda con
+  una clave que codifica el nivel de fusión (`duck`, `duck_Golden`,
+  `duck_Rainbow`) — las que ya existían de antes de esta pasada no cambiaron de
+  forma, así que no hace falta migrar nada. El comercio ya soporta mascotas
+  fusionadas sin tocar `TradeService`: para él, la clave es solo una cadena más.
+- Reparado un bug de posicionamiento que introduje yo mismo al principio de esta
+  pasada: dos botones nuevos (fusionar, en `PetsPanel`) usaban una posición que
+  mezclaba escala con un desplazamiento en píxeles calculado a mano asumiendo un
+  ancho de fila fijo — que no está garantizado, porque el ancho real lo decide el
+  contenedor (`ScrollingFrame`) donde vive la fila. Corregido a escala pura.
+
+### Por qué no toqué el disolvido píxel a píxel (`EditableImage`)
+
+Es la pieza que más veces he señalado como aproximación deliberada, así que antes
+de cerrar esta pasada investigué en serio si podía completarla: `EditableImage`
+tiene un error activo y documentado ahora mismo al aplicarse sobre un `Decal` vía
+`Content.fromObject()` ("ContentId expected, got Content"), y el soporte en
+`SurfaceAppearance` —la alternativa— se añadió a Studio hace apenas unos días.
+Implementar esto a ciegas, sin poder abrir Studio para comprobarlo, sobre la
+mecánica central del juego, justo antes de tu primera prueba real, es más riesgo
+que "completitud": si la API falla o me equivoco en la firma de un método, cambio
+un sistema que ya funciona (aunque simplificado) por uno roto. Me pareció la
+decisión responsable, no la cómoda — te lo explico en vez de dejarlo caer en
+silencio. El sistema actual (dos piezas superpuestas, transparencia dirigida por
+`Progress`) se queda como está.
+
+También busqué un asset de sonido de agua a presión integrado en Roblox y seguro
+de usar: no encontré ninguno que pudiera verificar como gratuito o de tu
+propiedad — solo assets de terceros en el Creator Store, que no voy a asumir que
+puedes usar sin que tú los adquieras. Sigue siendo el único hueco que de verdad
+depende de que añadas algo tú mismo.
+
+### Un bug real que encontré revisando el menú (antes de esta pasada)
+
+Al construir el menú con pestañas (necesario porque ya no cabían 9 botones sueltos
+en pantalla), varios botones quedaron como hijos directos de contenedores con
+`UIListLayout` (la fila de pestañas, el contenido de una pestaña, el selector de
+mascota del comercio). El problema: todo botón de `Widgets.pillButton` añade su
 sombra como un hermano en el mismo padre — si ese padre tiene `UIListLayout`, la
 sombra cuela como un elemento más de la lista y descoloca todo lo que va detrás.
-Lo comprobé programáticamente barriendo los 12 archivos de UI en busca de este
-patrón exacto y corregí los 3 sitios reales envolviendo cada botón en su propio
-`Frame` (ver `MenuShell.luau`, `RebirthPanel.luau`, `TradePanel.luau`).
+Lo comprobé programáticamente barriendo los archivos de UI en busca de este patrón
+exacto y corregí los 3 sitios reales envolviendo cada botón en su propio `Frame`.
 
-### Lo que sigue siendo una aproximación deliberada
+### Lo que queda fuera a propósito
 
-- **El desprendido de la suciedad** sigue siendo dos piezas superpuestas, no el
-  disolvido píxel a píxel con `EditableImage` del documento de diseño (sección 3.2).
-- **Sin sonido todavía**: sigue sin `SoundId` por el mismo motivo de siempre, no voy
-  a inventar un asset que no sé si existe.
-- Los contratos VIP (Fase 3) siguen sin tener en cuenta el nivel de la población del
-  servidor al elegir objetivo — ajuste de balance pendiente de datos reales.
+- **El desprendido de la suciedad** sigue siendo dos piezas superpuestas — ver más
+  arriba por qué no se tocó esta pasada.
+- **Sin sonido**: el único hueco que depende de un asset que solo tú puedes aportar.
+- Los contratos VIP siguen sin tener en cuenta el nivel de la población del
+  servidor al elegir objetivo — ajuste de balance pendiente de datos reales de juego.
 - El pase de temporada premia con dinero, no con cosméticos/mascotas exclusivas de
   temporada — eso es contenido nuevo que diseñar, no algo que se puede improvisar
   sin inventar assets.
-- Sin fusión de mascotas ni trading de cosméticos (no hay cosméticos todavía) — el
-  documento de diseño ya los deja para más adelante.
+- Sin cosméticos (no existen todavía, no los pide ninguna fase) ni arte real —
+  todo sigue siendo cajas de colores.
+- La cadencia de LiveOps semanal/mensual del documento de diseño no es un
+  entregable de código, es un ritmo de contenido continuo — no aplica aquí.
 
 ## Estado
 
-Fase 4 en curso: escalado (9 zonas, certificación/rebirth, pase de temporada,
-comercio de mascotas, códigos) — los 5 puntos que pide esa fase del documento de
-diseño. Quedan fuera a propósito, para cuando haga falta: arte real (todo sigue
-siendo cajas de colores), sonido, el disolvido píxel a píxel, fusión de mascotas,
-UGC/cosméticos, y la cadencia de LiveOps semanal/mensual en sí (eso no es un
-entregable de código, es un ritmo de contenido continuo). Pendiente de probarse en
-Roblox Studio.
+Las 4 fases del documento de diseño están implementadas (prototipo, vertical
+slice, lanzamiento suave, escalado) más la fusión de mascotas. Es la primera vez
+que el proyecto llega a un punto natural de parada: todo lo que quedaba pendiente
+y era responsable completar sin poder probarlo en Studio está cerrado; lo que
+sigue fuera (sonido, arte real, `EditableImage`) depende de assets que tú tienes
+que aportar o de verificarlo primero en Studio. Ahora sí, pendiente de tu primera
+prueba real.

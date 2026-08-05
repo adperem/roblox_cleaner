@@ -32,11 +32,6 @@ local EventService = require(script.Parent.EventService)
 
 local CleaningService = {}
 
-local petsById = {}
-for _, pet in Pets do
-	petsById[pet.Id] = pet
-end
-
 -- jugador -> objetivo que está limpiando ahora mismo (o nil)
 local activeSessions: { [Player]: Part } = {}
 
@@ -51,12 +46,15 @@ local function getNozzlePower(player: Player): number
 end
 
 local function getPetMultiplier(player: Player): number
-	local equippedId = player:GetAttribute("EquippedPet")
-	if typeof(equippedId) ~= "string" then
+	local equippedKey = player:GetAttribute("EquippedPet")
+	if typeof(equippedKey) ~= "string" then
 		return 1
 	end
-	local pet = petsById[equippedId]
-	return if pet then 1 + pet.Multiplier else 1
+	local petId, tier = Pets.parseStorageKey(equippedKey)
+	if not Pets.getById(petId) then
+		return 1
+	end
+	return 1 + Pets.multiplierFor(petId, tier)
 end
 
 local function getWaterLimits(player: Player): (number, number, number)

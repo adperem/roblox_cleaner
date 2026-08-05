@@ -1,6 +1,6 @@
 --!strict
 --[[
-	TargetService — construye los objetivos sucios de las 5 zonas y es el
+	TargetService — construye los objetivos sucios de las 9 zonas y es el
 	registro único de "qué Part corresponde a qué TargetId" (CleaningService
 	y EventService lo consultan; EventService además registra ahí mismo la
 	Mega Suciedad, que no pertenece a ninguna zona).
