@@ -17,7 +17,7 @@ function ShopPanel.build(screenGui: ScreenGui)
 	local openButton = Widgets.pillButton({
 		Parent = screenGui,
 		Size = UDim2.fromOffset(64, 64),
-		Position = UDim2.new(0, 16, 0.5, -76),
+		Position = UDim2.new(0, 16, 0.5, -152),
 		AnchorPoint = Vector2.new(0, 0.5),
 		Text = "🛠️",
 		BackgroundColor = Theme.Color.Primary,
@@ -27,7 +27,7 @@ function ShopPanel.build(screenGui: ScreenGui)
 		Parent = screenGui,
 		OpenButton = openButton,
 		Size = UDim2.fromOffset(300, 260),
-		Position = UDim2.new(0, 92, 0.5, -76),
+		Position = UDim2.new(0, 92, 0.5, -152),
 		AnchorPoint = Vector2.new(0, 0.5),
 	})
 

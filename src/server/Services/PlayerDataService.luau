@@ -1,11 +1,14 @@
 --!strict
 --[[
 	PlayerDataService — único dueño y escritor del perfil guardado de cada
-	jugador (dinero, XP, boquilla, progreso de misiones diarias). Todo lo
-	demás lee/escribe a través de las funciones de este módulo, nunca tocando
-	el `IntValue` de leaderstats ni el perfil directamente — así el
+	jugador (dinero, XP, boquilla, mascotas, progreso de misiones diarias).
+	Todo lo demás lee/escribe a través de las funciones de este módulo, nunca
+	tocando el `IntValue` de leaderstats ni el perfil directamente — así el
 	leaderstat, los atributos que lee el HUD y lo que se guarda en el
-	DataStore no pueden desincronizarse entre sí.
+	DataStore no pueden desincronizarse entre sí. También es el único punto
+	donde se aplica el gamepass de Dinero x2, para que valga en todos los
+	sitios donde se gana dinero (limpiar, misiones, eventos) sin repetir la
+	lógica en cada uno.
 
 	Si el perfil no se puede cargar (típicamente: en Studio sin "Enable
 	Studio Access to API Services" activado en Game Settings > Security), la
@@ -21,6 +24,8 @@ local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Nozzles = require(ReplicatedStorage.Shared.Config.Nozzles)
 local Levels = require(ReplicatedStorage.Shared.Config.Levels)
 local DailyMissions = require(ReplicatedStorage.Shared.Config.DailyMissions)
+local Pets = require(ReplicatedStorage.Shared.Config.Pets)
+local GamepassService = require(script.Parent.GamepassService)
 
 local PlayerDataService = {}
 
@@ -32,6 +37,8 @@ export type ProfileData = {
 	TargetsCleanedToday: number,
 	MoneyEarnedToday: number,
 	ClaimedMissions: { [string]: boolean },
+	OwnedPets: { [string]: number },
+	EquippedPet: string?,
 }
 
 local TEMPLATE: ProfileData = {
@@ -42,6 +49,7 @@ local TEMPLATE: ProfileData = {
 	TargetsCleanedToday = 0,
 	MoneyEarnedToday = 0,
 	ClaimedMissions = {},
+	OwnedPets = {},
 }
 
 local missionsById = {}
@@ -72,6 +80,16 @@ local function ensureCurrentDay(data: ProfileData)
 	end
 end
 
+-- Único sitio donde se aplica el gamepass de Dinero x2. Solo a ganancias
+-- (montos positivos) — una compra en la tienda resta dinero con esta misma
+-- función y no debería duplicarse el descuento.
+local function applyMoneyMultiplier(player: Player, amount: number): number
+	if amount > 0 and GamepassService.playerOwns(player, "MoneyX2") then
+		return amount * 2
+	end
+	return amount
+end
+
 local function syncAttributes(player: Player, data: ProfileData)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	local money = leaderstats and leaderstats:FindFirstChild("Money") :: IntValue?
@@ -83,9 +101,14 @@ local function syncAttributes(player: Player, data: ProfileData)
 	player:SetAttribute("Level", Levels.levelForXp(data.XP))
 	player:SetAttribute("TargetsCleanedToday", data.TargetsCleanedToday)
 	player:SetAttribute("MoneyEarnedToday", data.MoneyEarnedToday)
+	player:SetAttribute("EquippedPet", data.EquippedPet)
 	for _, mission in DailyMissions do
 		local claimed: boolean = data.ClaimedMissions[mission.Id] == true
 		player:SetAttribute("Claimed_" .. mission.Id, claimed)
+	end
+	for _, pet in Pets do
+		local count: number = data.OwnedPets[pet.Id] or 0
+		player:SetAttribute("PetCount_" .. pet.Id, count)
 	end
 end
 
@@ -167,7 +190,16 @@ function PlayerDataService.addMoney(player: Player, amount: number)
 	if not profile then
 		return
 	end
-	profile.Data.Money = math.max(0, profile.Data.Money + amount)
+	profile.Data.Money = math.max(0, profile.Data.Money + applyMoneyMultiplier(player, amount))
+	syncAttributes(player, profile.Data)
+end
+
+function PlayerDataService.addXp(player: Player, amount: number)
+	local profile = loaded[player]
+	if not profile then
+		return
+	end
+	profile.Data.XP += amount
 	syncAttributes(player, profile.Data)
 end
 
@@ -188,10 +220,11 @@ function PlayerDataService.grantCleaningReward(player: Player, money: number, xp
 		return
 	end
 	ensureCurrentDay(profile.Data)
-	profile.Data.Money += money
+	local finalMoney = applyMoneyMultiplier(player, money)
+	profile.Data.Money += finalMoney
 	profile.Data.XP += xp
 	profile.Data.TargetsCleanedToday += 1
-	profile.Data.MoneyEarnedToday += money
+	profile.Data.MoneyEarnedToday += finalMoney
 	syncAttributes(player, profile.Data)
 end
 
@@ -215,8 +248,30 @@ function PlayerDataService.claimMission(player: Player, missionId: string): bool
 	end
 
 	profile.Data.ClaimedMissions[missionId] = true
-	profile.Data.Money += mission.MoneyReward
+	profile.Data.Money += applyMoneyMultiplier(player, mission.MoneyReward)
 	profile.Data.XP += mission.XpReward
+	syncAttributes(player, profile.Data)
+	return true
+end
+
+function PlayerDataService.addPet(player: Player, petId: string)
+	local profile = loaded[player]
+	if not profile then
+		return
+	end
+	profile.Data.OwnedPets[petId] = (profile.Data.OwnedPets[petId] or 0) + 1
+	syncAttributes(player, profile.Data)
+end
+
+function PlayerDataService.setEquippedPet(player: Player, petId: string?): boolean
+	local profile = loaded[player]
+	if not profile then
+		return false
+	end
+	if petId ~= nil and (profile.Data.OwnedPets[petId] or 0) <= 0 then
+		return false
+	end
+	profile.Data.EquippedPet = petId
 	syncAttributes(player, profile.Data)
 	return true
 end

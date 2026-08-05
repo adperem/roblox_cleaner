@@ -12,11 +12,16 @@ local TweenService = game:GetService("TweenService")
 local Theme = require(ReplicatedStorage.Shared.Theme)
 local Net = require(ReplicatedStorage.Shared.Net)
 local DailyMissions = require(ReplicatedStorage.Shared.Config.DailyMissions)
+local Mutations = require(ReplicatedStorage.Shared.Config.Mutations)
 local Widgets = require(script.Parent.Widgets)
 local StatusBar = require(script.Parent.StatusBar)
 local ShopPanel = require(script.Parent.ShopPanel)
 local ZonePanel = require(script.Parent.ZonePanel)
 local MissionsPanel = require(script.Parent.MissionsPanel)
+local PetsPanel = require(script.Parent.PetsPanel)
+local GamepassPanel = require(script.Parent.GamepassPanel)
+local AnnouncementBanner = require(script.Parent.AnnouncementBanner)
+local MegaDirtBanner = require(script.Parent.MegaDirtBanner)
 local SprayController = require(script.Parent.Parent.Controllers.SprayController)
 
 local player = Players.LocalPlayer
@@ -49,7 +54,7 @@ local function buildReticle(parent: Instance)
 	reticle.Parent = parent
 end
 
-local function buildProgressBar(parent: Instance): (Frame, Frame, TextLabel)
+local function buildProgressBar(parent: Instance): (Frame, Frame, TextLabel, TextLabel)
 	local container = Widgets.panel({
 		Parent = parent,
 		Size = UDim2.fromOffset(220, 40),
@@ -80,7 +85,22 @@ local function buildProgressBar(parent: Instance): (Frame, Frame, TextLabel)
 	label.ZIndex = 3
 	label.Parent = container
 
-	return container, fill, label
+	-- Insignia de mutación (×2, ×10, DORADA...), solo visible si no es la
+	-- mutación base ("Barro", multiplicador 1).
+	local badge = Instance.new("TextLabel")
+	badge.AnchorPoint = Vector2.new(0.5, 1)
+	badge.Position = UDim2.new(0.5, 0, 0, -4)
+	badge.Size = UDim2.fromOffset(140, 22)
+	badge.BackgroundTransparency = 1
+	badge.Font = Theme.Text.Small.Font
+	badge.TextSize = Theme.Text.Small.Size
+	badge.TextStrokeTransparency = 0
+	badge.TextStrokeColor3 = Theme.Color.Outline
+	badge.Text = ""
+	badge.Visible = false
+	badge.Parent = container
+
+	return container, fill, label, badge
 end
 
 local function buildCelebration(parent: Instance): (Frame, TextLabel)
@@ -137,12 +157,16 @@ function Hud.start()
 
 	StatusBar.build(screenGui)
 	buildReticle(screenGui)
-	local progressContainer, progressFill, progressLabel = buildProgressBar(screenGui)
+	local progressContainer, progressFill, progressLabel, mutationBadge = buildProgressBar(screenGui)
 	local celebrationFrame, celebrationLabel = buildCelebration(screenGui)
 	buildFireButton(screenGui)
 	ShopPanel.build(screenGui)
 	ZonePanel.build(screenGui)
 	MissionsPanel.build(screenGui)
+	PetsPanel.build(screenGui)
+	GamepassPanel.build(screenGui)
+	AnnouncementBanner.build(screenGui)
+	MegaDirtBanner.build(screenGui)
 
 	RunService.RenderStepped:Connect(function()
 		local target = SprayController.getAim()
@@ -151,6 +175,15 @@ function Hud.start()
 			progressContainer.Visible = true
 			progressFill.Size = UDim2.fromScale(progress / 100, 1)
 			progressLabel.Text = `{math.floor(progress)}%`
+
+			local mutation = Mutations.getById(target:GetAttribute("MutationId") :: string?)
+			if mutation.Multiplier > 1 then
+				mutationBadge.Visible = true
+				mutationBadge.Text = `{mutation.Name} ×{mutation.Multiplier}`
+				mutationBadge.TextColor3 = mutation.Color
+			else
+				mutationBadge.Visible = false
+			end
 		else
 			progressContainer.Visible = false
 		end
@@ -174,6 +207,14 @@ function Hud.start()
 		if mission then
 			popCelebration(`+${mission.MoneyReward}\n+{mission.XpReward} XP`)
 		end
+	end)
+
+	Net.getRemoteEvent("EventResolved").OnClientEvent:Connect(function(kind: unknown, money: unknown, xp: unknown)
+		if typeof(money) ~= "number" or typeof(xp) ~= "number" then
+			return
+		end
+		local label = if kind == "Mega" then "🏗️ ¡Mega Suciedad!" else "🚨 ¡Contrato VIP!"
+		popCelebration(`{label}\n+${money}  +{xp} XP`)
 	end)
 end
 

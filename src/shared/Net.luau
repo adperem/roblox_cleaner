@@ -19,6 +19,13 @@ export type EventName =
 	| "RequestTeleport"
 	| "RequestClaimMission"
 	| "MissionClaimed"
+	| "RequestBuyEgg"
+	| "PetHatched"
+	| "RequestEquipPet"
+	| "ServerAnnouncement"
+	| "EventResolved"
+	| "MegaDirtStarted"
+	| "MegaDirtEnded"
 
 local FOLDER_NAME = "PressureWashRemotes"
 

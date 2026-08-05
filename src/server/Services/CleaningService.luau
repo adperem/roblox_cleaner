@@ -6,9 +6,14 @@
 	El servidor decide cuánto avanza el progreso (según la boquilla que ÉL
 	mismo tiene registrada para ese jugador, no la que el cliente diga tener),
 	valida la distancia en cada tick, gasta y rellena el depósito de agua de
-	cada jugador, y es el único que toca el dinero y la XP (a través de
-	PlayerDataService). Ningún número que importe para la economía viaja
-	nunca desde el cliente.
+	cada jugador (más grande y más rápido con el gamepass VIP), aplica la
+	mutación del objetivo y el bonus de la mascota equipada al pagar, y es el
+	único que toca el dinero y la XP (a través de PlayerDataService). Ningún
+	número que importe para la economía viaja nunca desde el cliente.
+
+	Si el objetivo está marcado como evento (contrato VIP o Mega Suciedad),
+	el pago no sale de aquí: se registra cuánto aportó cada jugador y es
+	EventService quien reparte la recompensa al terminar.
 ]]
 
 local Players = game:GetService("Players")
@@ -18,10 +23,19 @@ local RunService = game:GetService("RunService")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Nozzles = require(ReplicatedStorage.Shared.Config.Nozzles)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
+local Mutations = require(ReplicatedStorage.Shared.Config.Mutations)
+local Pets = require(ReplicatedStorage.Shared.Config.Pets)
 local TargetService = require(script.Parent.TargetService)
 local PlayerDataService = require(script.Parent.PlayerDataService)
+local GamepassService = require(script.Parent.GamepassService)
+local EventService = require(script.Parent.EventService)
 
 local CleaningService = {}
+
+local petsById = {}
+for _, pet in Pets do
+	petsById[pet.Id] = pet
+end
 
 -- jugador -> objetivo que está limpiando ahora mismo (o nil)
 local activeSessions: { [Player]: Part } = {}
@@ -36,6 +50,21 @@ local function getNozzlePower(player: Player): number
 	return Nozzles[1].Power
 end
 
+local function getPetMultiplier(player: Player): number
+	local equippedId = player:GetAttribute("EquippedPet")
+	if typeof(equippedId) ~= "string" then
+		return 1
+	end
+	local pet = petsById[equippedId]
+	return if pet then 1 + pet.Multiplier else 1
+end
+
+local function getWaterLimits(player: Player): (number, number, number)
+	local isVip = GamepassService.playerOwns(player, "VIP")
+	local scale = if isVip then GameConfig.VipWaterMultiplier else 1
+	return GameConfig.WaterTankMax * scale, GameConfig.WaterDrainRate * scale, GameConfig.WaterRefillRate * scale
+end
+
 local function isInRange(player: Player, target: Part): boolean
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -47,6 +76,19 @@ end
 
 local function isCleaned(target: Part): boolean
 	return target:GetAttribute("Cleaned") == true
+end
+
+local function payoutNormalTarget(player: Player, target: Part)
+	local mutation = Mutations.getById(target:GetAttribute("MutationId") :: string?)
+	local basePayout = (target:GetAttribute("Payout") :: number) * mutation.Multiplier
+	local baseXp = (target:GetAttribute("XP") :: number) * mutation.Multiplier
+	local petMultiplier = getPetMultiplier(player)
+
+	local finalPayout = math.floor(basePayout * petMultiplier)
+	local finalXp = math.floor(baseXp)
+
+	PlayerDataService.grantCleaningReward(player, finalPayout, finalXp)
+	Net.getRemoteEvent("TargetCompleted"):FireClient(player, target:GetAttribute("TargetId"), finalPayout)
 end
 
 local function tick(dt: number)
@@ -68,29 +110,36 @@ local function tick(dt: number)
 			continue
 		end
 
-		local tank = (player:GetAttribute("WaterTank") :: number?) or GameConfig.WaterTankMax
+		local tankMax, drainRate, refillRate = getWaterLimits(player)
+		local tank = (player:GetAttribute("WaterTank") :: number?) or tankMax
 		if tank <= 0 then
 			continue -- sin agua: no limpia hasta que se rellene
 		end
 
 		local power = getNozzlePower(player)
-		local progress = math.min(100, (target:GetAttribute("Progress") :: number) + power * dt)
+		local increment = power * dt
+		local progress = math.min(100, (target:GetAttribute("Progress") :: number) + increment)
 		target:SetAttribute("Progress", progress)
-		player:SetAttribute("WaterTank", math.max(0, tank - GameConfig.WaterDrainRate * dt))
+		player:SetAttribute("WaterTank", math.max(0, tank - drainRate * dt))
 		drainedThisTick[player] = true
+
+		local isEvent = target:GetAttribute("IsEvent") == true
+		if isEvent then
+			EventService.addContribution(target, player, increment)
+		end
 
 		if progress >= 100 then
 			target:SetAttribute("Cleaned", true)
 			activeSessions[player] = nil
 
-			local payout = target:GetAttribute("Payout") :: number
-			local xp = target:GetAttribute("XP") :: number
-			PlayerDataService.grantCleaningReward(player, payout, xp)
-			Net.getRemoteEvent("TargetCompleted"):FireClient(player, target:GetAttribute("TargetId"), payout)
-
-			task.delay(GameConfig.RespawnDelay, function()
-				TargetService.reset(target)
-			end)
+			if isEvent then
+				EventService.resolve(target, player)
+			else
+				payoutNormalTarget(player, target)
+				task.delay(GameConfig.RespawnDelay, function()
+					TargetService.reset(target)
+				end)
+			end
 		end
 	end
 
@@ -99,9 +148,10 @@ local function tick(dt: number)
 		if drainedThisTick[player] then
 			continue
 		end
-		local tank = (player:GetAttribute("WaterTank") :: number?) or GameConfig.WaterTankMax
-		if tank < GameConfig.WaterTankMax then
-			player:SetAttribute("WaterTank", math.min(GameConfig.WaterTankMax, tank + GameConfig.WaterRefillRate * dt))
+		local tankMax, _, refillRate = getWaterLimits(player)
+		local tank = (player:GetAttribute("WaterTank") :: number?) or tankMax
+		if tank < tankMax then
+			player:SetAttribute("WaterTank", math.min(tankMax, tank + refillRate * dt))
 		end
 	end
 end

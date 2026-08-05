@@ -1,6 +1,9 @@
 --!strict
 --[[
-	TargetService — construye los objetivos sucios de las 3 zonas.
+	TargetService — construye los objetivos sucios de las 5 zonas y es el
+	registro único de "qué Part corresponde a qué TargetId" (CleaningService
+	y EventService lo consultan; EventService además registra ahí mismo la
+	Mega Suciedad, que no pertenece a ninguna zona).
 
 	Cada objetivo son dos parts superpuestas: una "limpia" debajo (siempre
 	sólida, da la colisión) y una "sucia" encima (sin colisión, es la que se
@@ -16,7 +19,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local Theme = require(ReplicatedStorage.Shared.Theme)
+local Net = require(ReplicatedStorage.Shared.Net)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
+local Mutations = require(ReplicatedStorage.Shared.Config.Mutations)
 
 local TAG = "DirtyTarget"
 
@@ -24,6 +29,19 @@ local TargetService = {}
 
 local targetsFolder: Folder
 local targetsById: { [string]: Part } = {}
+
+local function rollMutation(dirt: Part)
+	local mutation = Mutations.roll()
+	dirt:SetAttribute("MutationId", mutation.Id)
+	dirt.Color = if mutation.Id == "mud" then Theme.Color.Dirty else mutation.Color
+
+	if mutation.Announce then
+		local name = dirt:GetAttribute("DisplayName") or dirt.Name
+		Net.getRemoteEvent("ServerAnnouncement"):FireAllClients(
+			`✨ ¡{mutation.Name} (x{mutation.Multiplier}) apareció en "{name}"! ¡corre!`
+		)
+	end
+end
 
 local function buildTarget(zone: Zones.ZoneDef, def: Zones.TargetDef): Part
 	local worldPosition = zone.Origin + def.LocalPosition
@@ -46,7 +64,6 @@ local function buildTarget(zone: Zones.ZoneDef, def: Zones.TargetDef): Part
 	-- Un pelín más grande que la limpia para que la cubra del todo mientras está sucia.
 	dirt.Size = def.Size * 1.01
 	dirt.CFrame = clean.CFrame
-	dirt.Color = Theme.Color.Dirty
 	dirt.Material = Enum.Material.SmoothPlastic
 	dirt.Transparency = 0
 
@@ -56,10 +73,12 @@ local function buildTarget(zone: Zones.ZoneDef, def: Zones.TargetDef): Part
 	dirt:SetAttribute("Payout", def.Payout)
 	dirt:SetAttribute("XP", def.XP)
 	dirt:SetAttribute("Cleaned", false)
+	dirt:SetAttribute("IsEvent", false)
 
 	CollectionService:AddTag(dirt, TAG)
 	dirt.Parent = targetsFolder
 	targetsById[def.Id] = dirt
+	rollMutation(dirt)
 	return dirt
 end
 
@@ -93,9 +112,22 @@ function TargetService.getById(id: string): Part?
 	return targetsById[id]
 end
 
+-- Usado por EventService para que la Mega Suciedad (que no vive en ninguna
+-- zona) sea localizable por TargetId igual que cualquier objetivo normal.
+function TargetService.register(id: string, part: Part)
+	targetsById[id] = part
+end
+
+function TargetService.unregister(id: string)
+	targetsById[id] = nil
+end
+
 function TargetService.reset(target: Part)
 	target:SetAttribute("Progress", 0)
 	target:SetAttribute("Cleaned", false)
+	target:SetAttribute("IsEvent", false)
+	target:SetAttribute("EventEndsAt", nil)
+	rollMutation(target)
 end
 
 return TargetService

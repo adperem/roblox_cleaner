@@ -15,6 +15,23 @@ local GameConfig = {
 	WaterTankMax = 100,
 	WaterDrainRate = 14, -- %/s mientras se dispara
 	WaterRefillRate = 25, -- %/s mientras no se dispara
+	-- El gamepass VIP multiplica ambos por esto.
+	VipWaterMultiplier = 1.5,
+
+	-- Contrato VIP (documento de diseño, sección 5.2): reaparece cada
+	-- intervalo, coge un objetivo cualquiera ya existente y lo pone a
+	-- contrarreloj con recompensa repartida por contribución.
+	VipContractInterval = 240, -- segundos entre contratos
+	VipContractDuration = 90, -- segundos para completarlo
+	VipRewardMultiplier = 4, -- sobre el Payout/XP normales del objetivo
+	VipFinisherBonus = 1.2, -- +20% para quien lo remata
+
+	-- Mega Suciedad (sección 5.3): jefe de servidor cooperativo.
+	MegaDirtInterval = 1200, -- 20 minutos
+	MegaDirtDuration = 300, -- 5 minutos para limpiarla
+	MegaDirtBaseReward = 500, -- × jugadores conectados al aparecer
+	MegaDirtBaseXp = 100, -- × jugadores conectados al aparecer
+	MegaDirtDespawnDelay = 6, -- segundos que se queda visible ya limpia
 }
 
 return GameConfig
