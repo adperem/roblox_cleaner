@@ -21,6 +21,9 @@ Juego de limpieza con agua a presión para Roblox.
 
 ## Cómo probarlo
 
+📄 [`docs/GUIA_INSTALACION.html`](docs/GUIA_INSTALACION.html) — guía paso a paso con el
+mismo contenido que sigue, para abrir en el navegador o descargar.
+
 El código está organizado como proyecto [Rojo](https://rojo.space/) — no se edita nada
 dentro de Roblox Studio, solo se sincroniza lo que hay en `src/`.
 

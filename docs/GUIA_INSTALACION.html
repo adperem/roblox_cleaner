@@ -1,0 +1,593 @@
+<title>Pressure Wash Tycoon — Instalación y prueba</title>
+<style>
+  :root {
+    --bg: #063A5E;
+    --bg-alt: #052A45;
+    --surface: #0B2540;
+    --surface-2: #0E2E4E;
+    --ink: #EAF6FF;
+    --ink-dim: #8FB9D4;
+    --accent: #17C3F2;
+    --accent-strong: #64DBFA;
+    --money: #FFCB2F;
+    --success: #3ECF4B;
+    --danger: #FF4B4B;
+    --outline: #EAF6FF;
+    --outline-soft: rgba(234, 246, 255, 0.25);
+    --shadow-color: #021320;
+    --code-bg: #021320;
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #EAF6FF;
+    --bg-alt: #D6ECFA;
+    --surface: #FFFFFF;
+    --surface-2: #F3FAFF;
+    --ink: #0B2540;
+    --ink-dim: #3D6E8C;
+    --accent: #0E93BD;
+    --accent-strong: #086885;
+    --money: #B87800;
+    --success: #21832C;
+    --danger: #C8303A;
+    --outline: #0B2540;
+    --outline-soft: rgba(11, 37, 64, 0.18);
+    --shadow-color: #0B2540;
+    --code-bg: #072033;
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #EAF6FF;
+      --bg-alt: #D6ECFA;
+      --surface: #FFFFFF;
+      --surface-2: #F3FAFF;
+      --ink: #0B2540;
+      --ink-dim: #3D6E8C;
+      --accent: #0E93BD;
+      --accent-strong: #086885;
+      --money: #B87800;
+      --success: #21832C;
+      --danger: #C8303A;
+      --outline: #0B2540;
+      --outline-soft: rgba(11, 37, 64, 0.18);
+      --shadow-color: #0B2540;
+      --code-bg: #072033;
+      color-scheme: light;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection { background: var(--accent); color: var(--bg-alt); }
+
+  a { color: var(--accent-strong); }
+
+  h1, h2, h3 {
+    font-family: "Arial Black", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 900;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  code, pre, .mono {
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Roboto Mono", monospace;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: 3rem;
+  }
+
+  @media (max-width: 880px) {
+    .wrap { grid-template-columns: 1fr; }
+  }
+
+  /* ---------- Header ---------- */
+  header.hero {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding-bottom: 1.75rem;
+    border-bottom: 3px solid var(--outline-soft);
+    margin-bottom: 0.5rem;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-strong);
+    margin-bottom: 0.6rem;
+  }
+
+  .eyebrow::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--money);
+    box-shadow: 0 0 0 3px var(--outline-soft);
+  }
+
+  h1.title {
+    font-size: clamp(1.9rem, 3.4vw, 2.7rem);
+    letter-spacing: -0.01em;
+  }
+
+  .subtitle {
+    color: var(--ink-dim);
+    font-size: 1.02rem;
+    max-width: 46ch;
+    margin-top: 0.5rem;
+  }
+
+  .meta-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+  }
+
+  .badge {
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    border: 2px solid var(--outline);
+    background: var(--surface);
+    white-space: nowrap;
+  }
+
+  .badge.warn { border-color: var(--danger); color: var(--danger); }
+  .badge.ok { border-color: var(--success); color: var(--success); }
+
+  /* ---------- Rail ---------- */
+  nav.rail {
+    align-self: start;
+    position: sticky;
+    top: 1.5rem;
+  }
+
+  .hose {
+    position: relative;
+    padding-left: 1.6rem;
+  }
+
+  .hose::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 6px;
+    bottom: 6px;
+    width: 3px;
+    background: linear-gradient(var(--accent), var(--money));
+    border-radius: 3px;
+    opacity: 0.55;
+  }
+
+  .hose a {
+    position: relative;
+    display: block;
+    padding: 0.5rem 0 0.5rem 0.75rem;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--ink-dim);
+    text-decoration: none;
+    border-radius: 8px;
+  }
+
+  .hose a:hover { color: var(--ink); background: var(--outline-soft); }
+
+  .hose a::before {
+    content: attr(data-n);
+    position: absolute;
+    left: -1.6rem;
+    top: 0.42rem;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 3px solid var(--accent);
+    color: var(--ink);
+    font-size: 0.68rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .rail-note {
+    margin-top: 1.5rem;
+    font-size: 0.78rem;
+    color: var(--ink-dim);
+    padding-left: 1.6rem;
+  }
+
+  @media (max-width: 880px) {
+    nav.rail { position: static; }
+    .hose { display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; padding-left: 0; }
+    .hose::before { display: none; }
+    .hose a { padding-left: 1.9rem; }
+  }
+
+  /* ---------- Main ---------- */
+  main { min-width: 0; display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .panel {
+    background: var(--surface);
+    border: 3px solid var(--outline);
+    border-radius: 16px;
+    box-shadow: 5px 5px 0 var(--shadow-color);
+    padding: 1.6rem 1.7rem;
+    scroll-margin-top: 1.5rem;
+  }
+
+  .panel > h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    font-size: 1.25rem;
+  }
+
+  .step-chip {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: var(--bg-alt);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: 900;
+    border: 3px solid var(--outline);
+  }
+
+  .panel p { margin: 0.7rem 0 0; }
+  .panel p.lede { color: var(--ink-dim); }
+
+  .callout {
+    margin-top: 0.9rem;
+    padding: 0.85rem 1rem;
+    border-radius: 10px;
+    border-left: 4px solid var(--money);
+    background: var(--bg-alt);
+    font-size: 0.92rem;
+  }
+
+  .callout.danger { border-left-color: var(--danger); }
+  .callout.success { border-left-color: var(--success); }
+
+  /* code blocks */
+  .console {
+    margin-top: 0.9rem;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid var(--outline-soft);
+  }
+
+  .console-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface-2);
+    padding: 0.45rem 0.7rem;
+    font-size: 0.72rem;
+    color: var(--ink-dim);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .console-dots { display: flex; gap: 5px; }
+  .console-dots span {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .console-dots span:nth-child(1) { background: var(--danger); }
+  .console-dots span:nth-child(2) { background: var(--money); }
+  .console-dots span:nth-child(3) { background: var(--success); }
+
+  .copy-btn {
+    font: inherit;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: transparent;
+    border: 1px solid var(--outline-soft);
+    color: var(--ink-dim);
+    border-radius: 6px;
+    padding: 0.2rem 0.55rem;
+    cursor: pointer;
+  }
+
+  .copy-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .copy-btn:focus-visible, a:focus-visible, .hose a:focus-visible {
+    outline: 2px solid var(--accent-strong);
+    outline-offset: 2px;
+  }
+
+  pre.code {
+    margin: 0;
+    padding: 0.9rem 1rem;
+    background: var(--code-bg);
+    color: #DCEFFB;
+    font-size: 0.86rem;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  :root[data-theme="light"] pre.code { color: #E7F3FA; }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) pre.code { color: #E7F3FA; }
+  }
+
+  .menu-icons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.9rem;
+  }
+
+  .menu-icons span {
+    font-size: 0.82rem;
+    background: var(--bg-alt);
+    border: 2px solid var(--outline-soft);
+    border-radius: 999px;
+    padding: 0.3rem 0.7rem;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  @media (max-width: 640px) {
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+
+  details.optional {
+    background: var(--surface);
+    border: 2px dashed var(--outline-soft);
+    border-radius: 16px;
+    padding: 1.2rem 1.5rem;
+  }
+
+  details.optional summary {
+    cursor: pointer;
+    font-weight: 800;
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  details.optional summary .badge { margin-left: auto; }
+
+  details.optional[open] summary { margin-bottom: 0.8rem; }
+
+  ol.plain, ul.plain {
+    margin: 0.7rem 0 0;
+    padding-left: 1.2rem;
+  }
+
+  ol.plain li, ul.plain li { margin: 0.35rem 0; }
+
+  footer {
+    grid-column: 1 / -1;
+    margin-top: 1rem;
+    padding-top: 1.5rem;
+    border-top: 3px solid var(--outline-soft);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.85rem;
+    color: var(--ink-dim);
+  }
+
+  footer a { color: var(--ink-dim); text-decoration: underline; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .panel { scroll-behavior: smooth; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <div>
+      <div class="eyebrow">Pressure Wash Tycoon · guía de instalación</div>
+      <h1 class="title">De este repo a jugando en Studio</h1>
+      <p class="subtitle">Siete pasos para sincronizar el proyecto con Rojo, abrirlo en Roblox Studio
+        y probar las cuatro fases ya implementadas — boquillas, zonas, mascotas, comercio y más.</p>
+    </div>
+    <div class="meta-badges">
+      <span class="badge">rama <code>claude/roblox-pressure-wash-game-xebj53</code></span>
+      <span class="badge warn">PR #2 cerrado sin fusionar</span>
+    </div>
+  </header>
+
+  <nav class="rail">
+    <div class="hose">
+      <a href="#pre" data-n="•">Antes de empezar</a>
+      <a href="#s0" data-n="0">Clonar y cambiar de rama</a>
+      <a href="#s1" data-n="1">Instalar Rojo</a>
+      <a href="#s2" data-n="2">Crear el lugar en Studio</a>
+      <a href="#s3" data-n="3">Activar el guardado</a>
+      <a href="#s4" data-n="4">Sincronizar</a>
+      <a href="#s5" data-n="5">Conectar el plugin</a>
+      <a href="#s6" data-n="6">Jugar</a>
+      <a href="#multi" data-n="+">Probar con varios jugadores</a>
+      <a href="#publish" data-n="↗">Publicar de verdad</a>
+    </div>
+    <p class="rail-note">Cada paso depende del anterior — síguelos en orden la primera vez.</p>
+  </nav>
+
+  <main>
+    <section class="panel" id="pre">
+      <h2><span class="step-chip">•</span> Antes de empezar</h2>
+      <p class="lede">Necesitas tres cosas instaladas. Nada de esto se descarga desde esta guía.</p>
+      <ul class="plain">
+        <li>Una cuenta de Roblox (para abrir Studio).</li>
+        <li><a href="https://create.roblox.com/studio" target="_blank" rel="noopener">Roblox Studio</a> instalado.</li>
+        <li><code>git</code> instalado y funcionando en tu terminal.</li>
+      </ul>
+      <div class="callout danger">
+        <strong>El PR #2 se cerró sin fusionarse a <code>main</code>.</strong> No afecta a esta guía: vas a
+        trabajar directamente sobre la rama <code>claude/roblox-pressure-wash-game-xebj53</code>, que tiene
+        todo el código. Si quieres que reabra el PR o que fusione a <code>main</code> antes de que sigas, dímelo.
+      </div>
+    </section>
+
+    <section class="panel" id="s0">
+      <h2><span class="step-chip">0</span> Clona el repo y cambia a la rama del juego</h2>
+      <p>El código de las 4 fases vive en una rama aparte, no en <code>main</code>.</p>
+      <div class="console">
+        <div class="console-bar"><div class="console-dots"><span></span><span></span><span></span></div>terminal<button class="copy-btn" data-copy>copiar</button></div>
+        <pre class="code">git clone https://github.com/adperem/roblox_cleaner.git
+cd roblox_cleaner
+git checkout claude/roblox-pressure-wash-game-xebj53</pre>
+      </div>
+    </section>
+
+    <section class="panel" id="s1">
+      <h2><span class="step-chip">1</span> Instala Rojo</h2>
+      <p>El proyecto no se edita dentro de Studio — Rojo sincroniza lo que hay en <code>src/</code> hacia
+        un lugar de Studio abierto. Necesitas dos piezas: el plugin de Studio y algo que sirva los archivos.</p>
+      <div class="grid-2">
+        <div>
+          <p><strong>Plugin de Studio</strong> (obligatorio)</p>
+          <ul class="plain">
+            <li>Instálalo desde su <a href="https://create.roblox.com/store/asset/13916111004" target="_blank" rel="noopener">página en el Creator Store</a>.</li>
+          </ul>
+        </div>
+        <div>
+          <p><strong>Servidor Rojo</strong> (elige uno)</p>
+          <ul class="plain">
+            <li>Extensión de VS Code <code>Rojo</code> (de evaera), o</li>
+            <li>CLI: <code>cargo install rojo</code> / <code>aftman install</code></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="s2">
+      <h2><span class="step-chip">2</span> Abre Studio y crea un lugar</h2>
+      <p>Cualquier plantilla vale, incluida Baseplate vacía. Si el lugar no tiene ya un suelo y un
+        <code>SpawnLocation</code>, el propio juego crea uno mínimo al arrancar — no necesitas
+        prepararlo tú.</p>
+    </section>
+
+    <section class="panel" id="s3">
+      <h2><span class="step-chip">3</span> Activa el guardado (opcional pero recomendado)</h2>
+      <p><strong>Game Settings → Security → "Enable Studio Access to API Services".</strong></p>
+      <p class="lede">Sin esto el juego funciona igual de principio a fin — solo que ProfileStore avisa
+        por consola y no persiste dinero, mascotas ni progreso entre partidas de prueba.</p>
+    </section>
+
+    <section class="panel" id="s4">
+      <h2><span class="step-chip">4</span> Sincroniza el proyecto</h2>
+      <p>Desde la carpeta del repo:</p>
+      <div class="console">
+        <div class="console-bar"><div class="console-dots"><span></span><span></span><span></span></div>terminal<button class="copy-btn" data-copy>copiar</button></div>
+        <pre class="code">rojo serve</pre>
+      </div>
+      <p class="lede">O, si usas VS Code, la paleta de comandos → <code>Rojo: Start Server</code>.</p>
+    </section>
+
+    <section class="panel" id="s5">
+      <h2><span class="step-chip">5</span> Conecta el plugin</h2>
+      <p>En Studio, pestaña <strong>Plugins</strong> → icono de Rojo → <strong>Connect</strong>. Verás
+        aparecer <code>ReplicatedStorage.Shared</code>, <code>ServerScriptService</code> y el resto de
+        carpetas del repo dentro del árbol de Studio.</p>
+    </section>
+
+    <section class="panel" id="s6">
+      <h2><span class="step-chip">6</span> Dale a Play</h2>
+      <p>Apareces en el Barrio con la mira fija en el centro de la pantalla: gira la cámara para apuntar
+        y mantén pulsado 💦 (o clic izquierdo en PC) para disparar agua a presión.</p>
+      <p>El botón <strong>☰</strong> (abajo a la izquierda) abre el menú con nueve pestañas:</p>
+      <div class="menu-icons">
+        <span>🛠️ boquillas</span>
+        <span>🗺️ mapa</span>
+        <span>🎯 misiones</span>
+        <span>🐾 mascotas</span>
+        <span>💎 gamepasses</span>
+        <span>🏆 certificación</span>
+        <span>🎫 pase de temporada</span>
+        <span>🎁 códigos</span>
+        <span>🤝 comercio</span>
+      </div>
+    </section>
+
+    <section class="panel" id="multi">
+      <h2><span class="step-chip">+</span> Probar con varios jugadores</h2>
+      <p>Los contratos VIP, la Mega Suciedad y el comercio de mascotas necesitan más de un jugador en el
+        servidor para verse de verdad.</p>
+      <div class="callout success">
+        Pestaña <strong>Test</strong> → menú desplegable junto a <strong>Play</strong> →
+        <strong>Play Here</strong> → elige 2 o más jugadores. Studio abre varias ventanas del cliente
+        contra el mismo servidor local.
+      </div>
+    </section>
+
+    <details class="optional" id="publish">
+      <summary>Publicar el juego de verdad <span class="badge">opcional</span></summary>
+      <p class="lede">No hace falta para probarlo en Studio — solo si quieres que exista como experiencia
+        pública en Roblox.</p>
+      <ol class="plain">
+        <li>En Studio: <strong>File → Publish to Roblox As...</strong> y elige nombre y visibilidad.</li>
+        <li>En el <a href="https://create.roblox.com/dashboard/creations" target="_blank" rel="noopener">Creator Dashboard</a>: sube icono, capturas y descripción.</li>
+        <li>Roblox pedirá una clasificación de edad antes de hacerlo público.</li>
+        <li>Si vas a vender los gamepasses reales (Dinero x2, VIP, Pase de temporada), créalos en el
+          dashboard del juego publicado y copia sus <code>ProductId</code> a
+          <code>src/shared/Config/Gamepasses.luau</code> — hoy están todos en <code>0</code> como
+          marcador de posición. Vuelve a publicar tras el cambio.</li>
+      </ol>
+    </details>
+  </main>
+
+  <footer>
+    <span>Pressure Wash Tycoon — código en <a href="https://github.com/adperem/roblox_cleaner" target="_blank" rel="noopener">adperem/roblox_cleaner</a></span>
+    <span>Diseño: <code>docs/DISENO_JUEGO.md</code> · Tokens: <code>src/shared/Theme.luau</code></span>
+  </footer>
+</div>
+
+<script>
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var pre = btn.closest('.console').querySelector('pre.code');
+      var text = pre.textContent;
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).catch(function () {});
+      }
+      var original = btn.textContent;
+      btn.textContent = 'copiado';
+      setTimeout(function () { btn.textContent = original; }, 1200);
+    });
+  });
+</script>
