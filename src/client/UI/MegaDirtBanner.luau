@@ -4,6 +4,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 local Theme = require(ReplicatedStorage.Shared.Theme)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -86,7 +87,10 @@ function MegaDirtBanner.build(screenGui: ScreenGui)
 			end
 			local progress = (activeTarget:GetAttribute("Progress") :: number?) or 0
 			barFill.Size = UDim2.fromScale(math.clamp(progress / 100, 0, 1), 1)
-			local remaining = math.max(0, math.floor(endsAt - os.clock()))
+			-- `endsAt` es el os.time() del servidor (segundos Unix): se compara
+			-- con la hora del servidor, no con os.clock() (segundos desde que
+			-- arrancó este cliente, daba una cuenta atrás de ~1.800 millones).
+			local remaining = math.max(0, math.floor(endsAt - Workspace:GetServerTimeNow()))
 			timeLabel.Text = `{math.floor(progress)}% — {remaining}s`
 		end)
 	end
