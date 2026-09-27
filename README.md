@@ -19,7 +19,26 @@ Juego de limpieza con agua a presión para Roblox.
 - [`src/shared/Theme.luau`](src/shared/Theme.luau) — los tokens de ese sistema
   traducidos a Luau. Única fuente de verdad para colores, radios y animaciones.
 
-## Cómo probarlo
+## Automatización: Claude programa, prueba y publica
+
+📄 [`docs/AUTOMATIZACION.md`](docs/AUTOMATIZACION.md) — cómo funciona y los 4 pasos que
+solo tú puedes hacer (una vez, unos 15 minutos).
+
+Cada push pasa por GitHub Actions (`.github/workflows/roblox.yml`):
+
+1. **Sin credenciales, siempre**: compila el lugar con Rojo, comprueba que los
+   RemoteEvents son coherentes, analiza el código con los tipos de la API de Roblox
+   (luau-lsp) y ejecuta las pruebas de configuración (`tests/`, con Lune).
+2. **En un servidor real de Roblox** (con la API Luau Execution de Open Cloud): sube el
+   lugar como versión guardada que los jugadores no ven, arranca el servidor completo y
+   pasa todas las pruebas, incluidas las de `tests/Engine/`.
+3. **Publica** esa misma compilación si todo pasa y es un push a `main` (o si se lanza a
+   mano con la opción `publicar`).
+
+Sin hacer nada, el paso 1 ya corre en cada push. Los pasos 2 y 3 se activan en cuanto
+añades la API key y los dos ids en GitHub.
+
+## Cómo probarlo a mano en Studio (opcional)
 
 📄 [`docs/GUIA_INSTALACION.html`](docs/GUIA_INSTALACION.html) — guía paso a paso con el
 mismo contenido que sigue, para abrir en el navegador o descargar.
@@ -63,7 +82,21 @@ sobre los 49 archivos del proyecto:
 
 Pruébalo en tu Studio y dime qué falla.
 
-### Qué se completó en esta pasada
+### Dos bugs que encontraron las comprobaciones nuevas
+
+- **El menú no funcionaba en un servidor recién arrancado.** Los RemoteEvents se creaban
+  en el servidor "la primera vez que alguien los pide", pero los que van de servidor a
+  cliente solo se pedían al dispararse. El cliente los espera con `WaitForChild` al
+  montar el HUD, así que se quedaba bloqueado en `MegaDirtStarted` (la primera Mega
+  Suciedad llega a los 20 minutos): sin menú ☰, sin tienda y sin nada de lo que va
+  detrás. Ahora `Net.createAll()` los crea todos al arrancar
+  (`src/server/Boot.luau`). `scripts/check_remotes.py` y `tests/Engine/Boot.spec.luau`
+  impiden que vuelva a pasar.
+- **La cuenta atrás de la Mega Suciedad marcaba ~1.800 millones de segundos**: restaba
+  `os.clock()` (tiempo desde que arrancó el cliente) a una hora Unix del servidor. Ahora
+  usa `Workspace:GetServerTimeNow()`.
+
+### Qué se completó en la pasada anterior
 
 - **Fusión de mascotas** (documento de diseño, sección 5.4): 5 iguales dan una
   versión Dorada, 5 Doradas dan una Arcoíris (tope). Cada mascota se guarda con
@@ -131,5 +164,10 @@ slice, lanzamiento suave, escalado) más la fusión de mascotas. Es la primera v
 que el proyecto llega a un punto natural de parada: todo lo que quedaba pendiente
 y era responsable completar sin poder probarlo en Studio está cerrado; lo que
 sigue fuera (sonido, arte real, `EditableImage`) depende de assets que tú tienes
-que aportar o de verificarlo primero en Studio. Ahora sí, pendiente de tu primera
-prueba real.
+que aportar o de verificarlo primero en Studio.
+
+Con el pipeline, el siguiente paso ya no es "ábrelo en Studio": son los 4 pasos
+de [`docs/AUTOMATIZACION.md`](docs/AUTOMATIZACION.md). Hechos esos, cada cambio se
+prueba dentro de un servidor real de Roblox y se publica sin que toques nada.
+Las pruebas en la nube todavía no han corrido nunca, porque necesitan esa API key:
+la primera ejecución es la que confirmará de verdad el arranque en Roblox.

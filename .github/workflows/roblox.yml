@@ -1,0 +1,72 @@
+# Pipeline completo del juego, sin abrir Roblox Studio:
+#
+# 1. Compila el lugar con Rojo, revisa los RemoteEvents, analiza el código con
+#    los tipos de la API de Roblox y ejecuta las pruebas que no necesitan el
+#    motor (Lune). No necesita credenciales: corre en cada push.
+# 2. Si Roblox está configurado (ver docs/AUTOMATIZACION.md): sube el lugar
+#    como versión guardada — los jugadores no la ven — y ejecuta todas las
+#    pruebas dentro de un servidor real de Roblox (Open Cloud Luau Execution).
+# 3. Si todo pasa y es un push a la rama principal (o se lanzó a mano con
+#    "publicar"), publica esa misma compilación para los jugadores.
+
+name: Roblox
+
+on:
+  push:
+    branches: ["**"]
+    paths-ignore:
+      - "docs/**"
+      - "design/**"
+      - "**.md"
+  workflow_dispatch:
+    inputs:
+      publicar:
+        description: "Publicar esta versión para los jugadores si las pruebas pasan"
+        type: boolean
+        default: false
+
+# Una ejecución por rama a la vez. En la rama principal no se cancela la que
+# está en marcha (podría estar publicando); en las demás, un push nuevo deja
+# obsoleto al anterior.
+concurrency:
+  group: roblox-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
+
+jobs:
+  roblox:
+    name: Compilar, probar y publicar
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+      ROBLOX_UNIVERSE_ID: ${{ vars.ROBLOX_UNIVERSE_ID }}
+      ROBLOX_PLACE_ID: ${{ vars.ROBLOX_PLACE_ID }}
+      ROBLOX_TEST_UNIVERSE_ID: ${{ vars.ROBLOX_TEST_UNIVERSE_ID }}
+      ROBLOX_TEST_PLACE_ID: ${{ vars.ROBLOX_TEST_PLACE_ID }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compilar, analizar y probar (sin Roblox)
+        run: scripts/check.sh
+
+      - name: ¿Está configurado el acceso a Roblox?
+        id: roblox
+        run: |
+          if [ -n "$ROBLOX_API_KEY" ] && [ -n "$ROBLOX_UNIVERSE_ID" ] && [ -n "$ROBLOX_PLACE_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Roblox sin configurar::Faltan ROBLOX_API_KEY, ROBLOX_UNIVERSE_ID o ROBLOX_PLACE_ID: se omiten las pruebas en Roblox y la publicación. Pasos en docs/AUTOMATIZACION.md."
+          fi
+
+      - name: Pruebas en un servidor real de Roblox
+        if: steps.roblox.outputs.ready == 'true'
+        run: python3 scripts/roblox_cloud.py test build/game.rbxl
+
+      - name: Publicar para los jugadores
+        if: >-
+          steps.roblox.outputs.ready == 'true' && (
+            (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
+            || inputs.publicar
+          )
+        run: python3 scripts/roblox_cloud.py publish build/game.rbxl

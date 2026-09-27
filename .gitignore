@@ -2,3 +2,6 @@
 *.rbxlx
 sourcemap.json
 .vscode/
+build/
+.tools/
+__pycache__/
